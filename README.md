@@ -97,6 +97,16 @@ py -3.14 piano_player.py
 - 自動推算移調（MIDI 由 KeySignature、MusicXML 由五度圈推算）
 - 合併同時刻的重疊音為和弦
 
+### 🔍 哪裡找樂譜
+
+手邊沒有 MusicXML / MIDI 檔的話，推薦使用 [**LibreScore**](https://librescore.org/) 取得樂譜：
+
+1. 到 [musescore.com](https://musescore.com/) 搜尋想要的曲目，複製樂譜頁面的網址。
+2. 在 [LibreScore](https://librescore.org/) 貼上網址，匯出為 `.mxl`（MusicXML）或 `.mid`（MIDI）。
+3. 把下載的檔案從 NTE Piano「檔案 → 匯入」進去，後續自動移調、分手、摺八度都會幫你處理。
+
+> 也可以使用 NPM 上的 [`dl-librescore`](https://www.npmjs.com/package/dl-librescore) 在命令列批次下載。請尊重原作者與譜面上傳者的版權，僅用於個人非商業練習用途。
+
 ---
 
 ## 📝 譜面 DSL 速覽
