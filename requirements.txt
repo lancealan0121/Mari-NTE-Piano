@@ -1,0 +1,18 @@
+PySide6>=6.6
+pynput>=1.7          # GUI 的全域 F6-F11 快捷鍵 + 一種按鍵後端
+pydirectinput-rgx    # DirectInput 後端（部分遊戲只吃這種）
+
+# 自動化任務（可選；未安裝時對應功能會在啟動時 failed signal 告知）
+mss>=9               # 視窗截圖（自動釣魚 / 自動音游）
+opencv-python>=4.9   # HSV 色彩過濾（自動釣魚拉力條）
+numpy>=1.26          # 影像 / 音訊張量
+
+# 自動閃避專屬（衍生自 ZZZSoundTrigger，需要樣本檔 assets/sounds/dodge.wav）
+librosa>=0.10        # 音訊樣本載入
+scipy>=1.11          # butter highpass + cross-correlation
+scikit-learn>=1.3    # scale 標準化
+soundcard>=0.4       # 系統 audio loopback
+
+# 失焦自動靜音遊戲（BackgroundAudioMuter；缺套件時功能 disabled）
+pycaw>=20240210      # Windows Core Audio session 控制（控制 HTGame.exe 的 mute）
+comtypes>=1.2        # pycaw 依賴 + thread-local COM init
