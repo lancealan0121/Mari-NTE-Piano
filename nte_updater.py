@@ -6,12 +6,12 @@
 - 刻意不用 QThread,理由見 CLAUDE.md「Threading pattern」段。
 
 零第三方依賴:urllib.request + ssl + hashlib + json 都是 stdlib,避免引入
-requests/certifi/urllib3 等四個 transitive deps(與主人「擔心 GitHub
-binary 供應鏈安全」的初衷矛盾)。
+requests/certifi/urllib3 等四個 transitive deps(與「GitHub binary
+供應鏈安全」初衷矛盾)。
 
 SHA256 驗證:GitHub REST API 2024 起在 assets[] 自動帶 `digest` 欄位
 (格式 "sha256:abc123..."),下載完整檔後比對 hash;不符即視為失敗、刪
-.part 檔。若 release 沒帶 digest,GUI 端會先警告再讓主人決定是否安裝。
+.part 檔。若 release 沒帶 digest,GUI 端會先警告再讓使用者決定是否安裝。
 """
 
 from __future__ import annotations

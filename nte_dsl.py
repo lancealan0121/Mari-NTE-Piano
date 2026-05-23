@@ -111,7 +111,7 @@ class Sheet:
     # 變速點: (start_beats, tempo) 排序列表;不含 beat 0 的初始 tempo。
     tempo_changes: list = field(default_factory=list)
     # A/B 播放範圍(秒);None = 不設,從頭播到尾。
-    # 用秒不用 beats:主人輸入直觀,且 BPM 變動時 AB 不會跟著漂移。
+    # 用秒不用 beats:輸入直觀,且 BPM 變動時 AB 不會跟著漂移。
     # 由 PlaybackWorker 起播時讀:A → initial_offset;B → 達到即 stop。
     play_range_start_seconds: float | None = None
     play_range_end_seconds: float | None = None

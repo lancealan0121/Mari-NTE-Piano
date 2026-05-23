@@ -1,6 +1,6 @@
 """NTE Piano 版本資訊單一真相。
 
-主人改版時只動 APP_VERSION,build.bat 會用 `py -c "import nte_version;
+改版時只動 APP_VERSION,build.bat 會用 `py -c "import nte_version;
 print(nte_version.APP_VERSION)"` 讀進來注入 installer.iss,piano_player.py
 則在 runtime 顯示在視窗標題與「關於」對話框。
 

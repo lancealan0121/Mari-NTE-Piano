@@ -114,7 +114,7 @@ class SmoothScrollArea(QScrollArea):
 # QComboBox 預設 view 在某些 Windows 風格下,popup 會以 translucent top-level
 # window 呈現:Qt 對 popup container 套 WA_TranslucentBackground=True,讓系統
 # 動畫期間透出桌面/視窗背景。QSS 對這個外層 popup window 完全無效,setPalette
-# 也只影響子 widget,造成主人看到的「展開過程純黑、完成後穿透露桌面」。
+# 也只影響子 widget,造成展開過程純黑、完成後穿透露桌面。
 #
 # 解法:換掉 view,自己:
 #   (1) 對 view 自身強制不透明、用 palette base 自畫底色
@@ -941,7 +941,7 @@ class SettingsPanel(QWidget):
         g = self._add_group("對話框")
 
         # 切歌/開檔/匯入/關視窗時若譜面 dirty,跳「尚未儲存」確認。
-        # 關掉等於「總是同意覆蓋」,主人換歌不會被打斷,但 dirty 改動可能被無聲丟棄。
+        # 關掉等於「總是同意覆蓋」,換歌不會被打斷,但 dirty 改動可能被無聲丟棄。
         discard = ToggleSwitchRow("未存檔提示")
         discard.setChecked(bool(self._get("confirm_discard_unsaved", True)))
         discard.toggled.connect(

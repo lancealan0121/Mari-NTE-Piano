@@ -167,7 +167,7 @@ START_DELAY_SECONDS = 1.0
 #   - frozen onedir / onefile:
 #       * bundled 資源在 sys._MEIPASS(onedir 6.x 指向 _internal/、onefile 指向
 #         解壓 temp);PyInstaller 5.x 老 onedir 沒設 _MEIPASS → fallback exe 旁
-#       * 使用者資料(歌曲、autosave、log、npy cache)放 exe 同目錄,主人能直接
+#       * 使用者資料(歌曲、autosave、log、npy cache)放 exe 同目錄,使用者能直接
 #         看到並丟譜面、看 log
 # ============================================================================
 def _is_frozen() -> bool:
@@ -195,8 +195,8 @@ def _user_data_dir(rel: str = "") -> Path:
 def _seed_default_songs() -> None:
     """首次啟動把 bundled 預設譜面 copy 一份到使用者 songs/。
 
-    songs/ 已存在就不動 — 主人若刪掉某首,下次啟動不會重新塞回來。
-    若主人想還原預設,直接砍掉整個 songs/ 重啟即可。
+    songs/ 已存在就不動 — 若使用者刪掉某首,下次啟動不會重新塞回來。
+    若要還原預設,直接砍掉整個 songs/ 重啟即可。
     """
     target = _user_data_dir("songs")
     if target.exists():
@@ -489,7 +489,7 @@ class SettingsManager:
         # 空字串視為停用此熱鍵。預設 F8(避開 F6/F7/F10/F11 已用)。
         "heist_auto_mode_hotkey": "f8",
         # v11:Piano Roll 重繪 FPS;30/60/120 三檔。
-        # 預設 60 兼顧流暢與功耗;120 對應高更新率螢幕或對延遲敏感的主人。
+        # 預設 60 兼顧流暢與功耗;120 對應高更新率螢幕或對延遲敏感的使用者。
         "roll_fps": 60,
         # v11:底部遊戲鋼琴鍵盤是否顯示。預設 True(維持原本看到的版面)。
         "show_piano_keyboard": True,
@@ -518,7 +518,7 @@ class SettingsManager:
         # False:回到舊行為 — set_zoom_factor 直接生效、無過渡。
         "smooth_zoom_pianoroll": True,
         # 啟動 5 秒後背景查 GitHub Releases latest tag,有新版會跳提示對話框。
-        # 6 小時節流(last_update_check_ts)避免頻繁打 API;主人按「略過此版本」
+        # 6 小時節流(last_update_check_ts)避免頻繁打 API;按「略過此版本」
         # 會寫入 update_skip_version,該版本以前的自動提示會被吃掉(手動檢查不受影響)。
         "auto_update_check": True,
         "last_update_check_ts": 0,
@@ -1756,7 +1756,7 @@ class PianoRollView(QWidget):
                 TRACK_INDEX.get(ev.strokes[0].label, 0)
                 if len(ev.strokes) == 1 else None
             )
-            # 右鍵 resize:保留現有 selection (主人多選後想拉一票同步變長度的場景)
+            # 右鍵 resize:保留現有 selection (多選後想拉一票同步變長度的場景)
             # 若點到的本就在多選裡 → 整批 resize;否則只 resize 自己。
             already_selected = (idx, clicked_label) in self._selected_strokes
             target_indices = (
@@ -1889,7 +1889,7 @@ class PianoRollView(QWidget):
                 continue
             # 該事件內哪些 stroke 是被選中要一起拖的(可能是子集 = 和弦中部分音被選)。
             # 子集時 partial=True,release 時主視窗會把這些 stroke 從原 chord 拆出,
-            # 形成新事件;未選的 stroke 留在原事件不動 — 這對齊主人「多選什麼動什麼」訴求。
+            # 形成新事件;未選的 stroke 留在原事件不動 — 對齊「多選什麼動什麼」訴求。
             all_labels = tuple(s.label for s in dev.strokes)
             if len(drag_indices) > 1 or idx != di:
                 # 多選或這個 di 不是被點擊的事件:嚴格按 _selected_strokes 投影出 labels
@@ -1996,7 +1996,7 @@ class PianoRollView(QWidget):
                 self._loop_end_seconds = new_s
             self.update()
             return
-        # 滑鼠靠近 marker 時改成水平拖動 cursor,提示主人可以抓;離開時還原。
+        # 滑鼠靠近 marker 時改成水平拖動 cursor,提示可以抓;離開時還原。
         if (
             not self._drag_active
             and not self._marquee_active
@@ -2242,7 +2242,7 @@ class PianoRollView(QWidget):
         # 多選一次拖完一次 emit:主視窗端只 push 一次 undo snapshot,
         # 一次 Ctrl+Z 即可整批還原(避免 N 個音符 → undo stack 多 N 個 snapshot)。
         # payload 多帶 selected_labels:partial drag(和弦只拖部分音)時主視窗端
-        # 走「拆出新事件 + 留原 chord」路徑,對齊主人「多選什麼動什麼」訴求。
+        # 走「拆出新事件 + 留原 chord」路徑,對齊「多選什麼動什麼」訴求。
         if any_moved:
             payload: list[tuple] = []
             for di, st in states.items():
@@ -2870,7 +2870,7 @@ class PianoRollView(QWidget):
                 mx = margin_left + (value - view_start) / view_span * usable_w
                 if mx < margin_left or mx > margin_left + usable_w:
                     continue
-                # 高亮拖動中的那一端,讓主人知道現在抓的是哪根。
+                # 高亮拖動中的那一端,標示現在抓的是哪根。
                 is_dragging = (
                     self._loop_drag_active and self._loop_drag_target == which
                 )
@@ -3101,7 +3101,7 @@ class OverviewBar(QWidget):
             loop_fill = QColor(THEME["accent"])
             loop_fill.setAlpha(55)
             painter.fillRect(QRectF(xa, 0, max(1.0, xb - xa), self.height()), loop_fill)
-        # 兩個 marker handle:不論成對與否都各自畫,讓主人能看到只設一邊的狀態
+        # 兩個 marker handle:不論成對與否都各自畫,讓使用者看到只設一邊的狀態
         for s in (self._loop_start_seconds, self._loop_end_seconds):
             if s is None:
                 continue
@@ -3513,7 +3513,7 @@ class PianoPlayerWindow(QMainWindow):
         self._update_progress_dialog: QProgressDialog | None = None
         self._pending_update_info: UpdateInfo | None = None
         self._manual_update_check_pending: bool = False
-        # 失焦自動靜音 muter:獨立於 task,跟 task 並行運作,主人切到別的視窗時
+        # 失焦自動靜音 muter:獨立於 task,跟 task 並行運作,使用者切到別的視窗時
         # 自動把 HTGame.exe 設 mute。pycaw 缺套件時 BackgroundAudioMuter
         # is_available() 為 False,GUI 端會 disable 對應選項。
         self._bg_audio_muter = BackgroundAudioMuter(
@@ -4433,7 +4433,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         - selected_labels:該事件中「實際被選中拖走」的 stroke labels。
           - 空 tuple 或等於事件全部 stroke labels:整事件被拖,走原 _apply_event_change。
           - 真子集(partial):把這些 stroke 從原 chord 「拆出」成新事件,未選的 stroke
-            留在原事件不動。對齊主人「多選什麼動什麼,別管和弦」的訴求。
+            留在原事件不動。對齊「多選什麼動什麼,別管和弦」的訴求。
         """
         if self._sheet is None or not payload:
             return
@@ -4713,7 +4713,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
           - 同 event 內 strokes 重複 label → 去重
           - duration < 最小限度 → 提升至最小
           - start_beats < 0 → clamp 到 0
-        只警告 (不破壞主人意圖):
+        只警告 (不破壞使用者意圖):
           - 同 onset 同 key 跨 event 衝突 → 第二個按下會被吃掉
           - 同 key 在 RETRIGGER_MIN_SECONDS 內連觸 → 遊戲可能吃不到
         """
@@ -4878,7 +4878,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         if candidates:
             self._load_file(random.choice(candidates))
         else:
-            # 沒有任何譜面可用;主視窗呈現空白狀態,主人可從「檔案 → 開啟/匯入」載入。
+            # 沒有任何譜面可用;主視窗呈現空白狀態,使用者可從「檔案 → 開啟/匯入」載入。
             self._sheet = None
             self._current_file = None
             self._dirty = False
@@ -4889,7 +4889,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         try:
             self.song_combo.clear()
             # 使用者譜面庫:exe 同目錄(frozen)或 piano_player.py 旁(dev)的 songs/。
-            # 主人可以直接丟新 .txt 進去,重啟後出現在下拉選單。
+            # 可以直接丟新 .txt 進去,重啟後出現在下拉選單。
             songs_dir = _user_data_dir("songs")
             if songs_dir.exists():
                 for path in sorted(songs_dir.glob("*.txt")):
@@ -5146,7 +5146,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
     @Slot()
     def save_score_as(self) -> None:
         # 預設檔名優先順序:已開啟的檔 → 匯入時的原始檔名 → score.txt
-        # 主人從 MXL/MIDI/MSCZ 匯入後直接另存,自動帶入原始檔名(放在 songs 目錄)。
+        # 從 MXL/MIDI/MSCZ 匯入後直接另存,自動帶入原始檔名(放在 songs 目錄)。
         if self._current_file is not None:
             default_path = str(self._current_file)
         elif self._imported_source_name:
@@ -5196,7 +5196,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             )
             return
 
-        # 主人可在設定面板關掉「刪除歌曲確認」,關掉時點到「刪除目前歌曲」就立刻刪。
+        # 設定面板可關掉「刪除歌曲確認」,關掉時點到「刪除目前歌曲」就立刻刪。
         if bool(self._settings.get("confirm_delete_song", True)):
             confirm = QMessageBox.question(
                 self,
@@ -5233,7 +5233,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         if next_path is not None:
             self._load_file(next_path)
         else:
-            # 沒有其他歌了,清空 sheet 與 piano roll,讓主人重新匯入或開啟。
+            # 沒有其他歌了,清空 sheet 與 piano roll,等待重新匯入或開啟。
             self._sheet = None
             self.piano_roll.set_sheet(None)
             self.overview_bar.set_sheet(None)
@@ -5707,7 +5707,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
     def _confirm_discard_changes(self) -> bool:
         if not self._dirty:
             return True
-        # 主人可在設定面板關掉「未存檔提示」,關掉時直接放行 = 視為同意覆蓋。
+        # 設定面板可關掉「未存檔提示」,關掉時直接放行 = 視為同意覆蓋。
         if not bool(self._settings.get("confirm_discard_unsaved", True)):
             return True
         result = QMessageBox.question(
@@ -6011,7 +6011,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             self.statusBar().showMessage(f"還原失敗:{exc}", 4000)
             return
         # 保留 undo/redo 前的瀏覽位置(set_sheet 內會把 _browse_offset 歸零,
-        # 那是為了「載入全新譜面」設計;undo/redo 不該把主人捲到中段的位置打回 0)。
+        # 那是為了「載入全新譜面」設計;undo/redo 不該把已捲到中段的視窗打回 0)。
         # 播放中時 current_seconds 包含 worker 推進,不能直接拿來還原,改保留 browse_offset。
         prev_browse = self.piano_roll._browse_offset
         # 進行中的平滑捲動動畫也停掉,避免動畫終點蓋過剛還原的位置。
@@ -6237,7 +6237,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         並把對方那一個 widget 的 marker 也帶到一致狀態。
 
         worker 啟動時讀這兩個值決定播放範圍;running 中改不會即時生效
-        (避免 schedule rebuild 跟 cursor 不連續)— 主人需停掉再播。
+        (避免 schedule rebuild 跟 cursor 不連續)— 需停掉再播。
 
         AB 點也寫進 sheet.play_range_*_seconds 並反映到 BPM 區的 spinbox,
         讓拖曳/spinbox/sheet 三向同步。寫入時用 _suppress_sheet_field_signals
@@ -6676,7 +6676,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
 
     @Slot(bool)
     def _on_mute_on_focus_loss_toggled(self, checked: bool) -> None:
-        # 主人切換選單後立刻啟動或停止 muter,並落盤 setting。
+        # 切換選單後立刻啟動或停止 muter,並落盤 setting。
         # 停止時 BackgroundAudioMuter.stop() 內部會強制 SetMute(False),
         # 確保遊戲不會殘留被靜音的狀態。
         self._settings.set("mute_on_focus_loss", bool(checked))
@@ -6778,7 +6778,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
                 self.act_auto_stop.setChecked(False)
                 self.act_auto_stop.blockSignals(False)
             return
-        # 取消勾選 = 主人要停。沒任務就靜默不動作(避免 finished slot 把 UI
+        # 取消勾選 = 使用者要停。沒任務就靜默不動作(避免 finished slot 把 UI
         # reset 為 False 後又被 toggled 回 callback 觸發 stop)。
         if self._automation_task is None:
             return
@@ -6830,7 +6830,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
 
         啟動前先 ping 一次 find_game_window():沒偵測到 NTE 就直接拒絕,不開
         背景 thread。能避免 task 跑進 listener.start() / mss capture 後再退出
-        的 1-2 秒空轉,並讓主人即時看到「請先開遊戲」提示。
+        的 1-2 秒空轉,並讓使用者即時看到「請先開遊戲」提示。
         """
         if self._worker is not None:
             self.statusBar().showMessage("演奏中無法啟動自動化,請先 F7 停止", 4000)
@@ -6958,7 +6958,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         if info is None:
             if manual:
                 QMessageBox.information(
-                    self, "檢查更新", "已是最新版本喵 (=^･ω･^=)"
+                    self, "檢查更新", "已是最新版本"
                 )
             return
         # 自動檢查時,曾按過「略過此版本」就跳過。手動點擊一律顯示。
@@ -7048,7 +7048,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             self._update_progress_dialog.close()
             self._update_progress_dialog = None
         info = self._pending_update_info
-        # 若 release 沒帶 digest,先給警告讓主人決定是否仍要安裝。
+        # 若 release 沒帶 digest,先給警告讓使用者決定是否仍要安裝。
         if info is not None and info.digest is None:
             warn = QMessageBox.warning(
                 self,
@@ -7145,7 +7145,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         if not self._confirm_discard_changes():
             event.ignore()
             return
-        # 視窗關閉時 dock 會自動 hide,不應視為主人主動隱藏 → 把 visibilityChanged
+        # 視窗關閉時 dock 會自動 hide,不應視為使用者主動隱藏 → 把 visibilityChanged
         # 訊號斷開,免得把 settings 的 automation_dock_visible 寫成 False。
         if hasattr(self, "_automation_dock") and self._automation_dock is not None:
             try:

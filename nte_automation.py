@@ -231,9 +231,9 @@ MOUSEEVENTF_RIGHTUP = 0x0010
 
 
 def _send_mouse_click(screen_x: int, screen_y: int, button: str = "left") -> None:
-    """SetCursorPos + mouse_event;呼叫前後保存/還原主人游標位置避免搶滑鼠。
+    """SetCursorPos + mouse_event;呼叫前後保存/還原使用者游標位置避免搶滑鼠。
 
-    SetCursorPos 會把游標瞬間搬到目標位置,主人正在用滑鼠時會看到游標跳一下。
+    SetCursorPos 會把游標瞬間搬到目標位置,使用者正在操作滑鼠時會看到游標跳一下。
     這裡在送點擊事件前後保存原始位置,事件送完立刻還原,把感受降到最低。
     遊戲若拒絕後台輸入(常見於 DirectInput 鎖滑鼠的遊戲)點擊可能無效,
     但這已是最通用方案。
@@ -1087,7 +1087,7 @@ class RhythmTask(AutomationTask):
     Ported from ok-nte-main/src/tasks/RhythmTask.py
 
     迴圈:點開始演奏 → 偵測按鍵(D/F/J/K)→ 結算 → 關閉結算 → 回選歌界面 → 下一輪。
-    主人需先把遊戲調到「選歌界面」,task 才能正確點到開始演奏鈕。
+    使用者需先把遊戲調到「選歌界面」,task 才能正確點到開始演奏鈕。
 
     與 ok-nte 對齊的關鍵:每幀只截一次 client area(grab_full),四個偵測點都在
     這張 frame 上做 numpy slice — 比起連 4 次 mss.grab(1×1) 快數倍,timing 抖動
@@ -1289,7 +1289,7 @@ class RhythmTask(AutomationTask):
                     return
             self._tick(capture)
             # 加 3ms sleep 限速 ≈ 333Hz polling,遠超人類反應時間,不會錯過鼓點。
-            # 沒有這個 sleep,grab_full() + 處理迴圈會把單核打滿 → 主人滑鼠
+            # 沒有這個 sleep,grab_full() + 處理迴圈會把單核打滿 → 使用者滑鼠
             # 卡頓 + 遊戲視窗截圖頻繁觸發 DWM 重繪 → 看起來會閃。
             if self._stop_event.wait(0.003):
                 return
@@ -1447,7 +1447,7 @@ class RhythmTask(AutomationTask):
 class BackgroundAudioMuter:
     """遊戲失焦時自動把 HTGame.exe 靜音,回到前景時還原。
 
-    POLL_INTERVAL 設 0.3s — 主人切視窗到聽見聲音之間最長延遲 ~0.3s。
+    POLL_INTERVAL 設 0.3s — 使用者切視窗到聽見聲音之間最長延遲 ~0.3s。
     `_currently_muted` 記錄上次主動寫入的 mute 狀態,避免每 tick 都 SetMute
     (pycaw 的 COM call 不便宜)。stop() 結束前一定 SetMute(False),不能讓
     遊戲留在被我們靜音的狀態。
@@ -1733,7 +1733,7 @@ class BackgroundAudioMuter:
 #    (粉爪是常駐 helper,跟其他 task 同時用沒衝突)。
 # 2. 不註冊全域 hotkey — 直接用 GetAsyncKeyState polling,避免搶走 F 鍵在其他
 #    場合的輸入(瀏覽器、文字編輯器都會用到 F)。
-# 3. 只在 NTE 視窗為前景時送 key/scroll,避免主人在 piano editor 打字時誤觸發。
+# 3. 只在 NTE 視窗為前景時送 key/scroll,避免在 piano editor 打字時誤觸發。
 # 4. 原版的「快速奔跑切角色」需要 scene 偵測(is_char_at_index),這裡用不到也跑
 #    不起來,故略過 — 只實作 F 連點 + 滾輪交替這兩個核心便利。
 # ============================================================================
@@ -1988,7 +1988,7 @@ class HeistController:
             daemon=True,
         )
         self._thread.start()
-        # 啟用訊息把目前模式也報出去,主人一眼看到生效中的功能。
+        # 啟用訊息把目前模式也報出去,使用者一眼看到生效中的功能。
         if self._auto_mode:
             mode_str = "全自動"
         else:

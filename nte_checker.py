@@ -7,7 +7,7 @@
     NTECheckerProbe   - 在 main thread QTimer 1Hz tick 偵測遊戲視窗狀態
     NTECheckerWidget  - 顯示視窗存在/前景燈號與基本資訊的 widget
 
-設計刻意輕量:不截圖、不做場景顏色推測,只回答兩個問題給主人:
+設計刻意輕量:不截圖、不做場景顏色推測,只回答兩個問題:
     1. NTE 視窗找到了沒?
     2. NTE 視窗是前景嗎?
 
