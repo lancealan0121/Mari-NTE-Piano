@@ -99,13 +99,14 @@ py -3.14 piano_player.py
 
 ### 🔍 哪裡找樂譜
 
-手邊沒有 MusicXML / MIDI 檔的話，推薦使用 [**LibreScore**](https://librescore.org/) 取得樂譜：
+手邊沒有 MusicXML / MIDI 檔的話，推薦使用 [**LibreScore**](https://github.com/LibreScore/app-librescore) 取得樂譜：
 
-1. 到 [musescore.com](https://musescore.com/) 搜尋想要的曲目，複製樂譜頁面的網址。
-2. 在 [LibreScore](https://librescore.org/) 貼上網址，匯出為 `.mxl`（MusicXML）或 `.mid`（MIDI）。
-3. 把下載的檔案從 NTE Piano「檔案 → 匯入」進去，後續自動移調、分手、摺八度都會幫你處理。
+1. 到 [LibreScore App](https://github.com/LibreScore/app-librescore) 的 Releases 頁面下載對應平台的安裝檔（Windows / macOS / Linux / Android 皆有）。
+2. 到 [musescore.com](https://musescore.com/) 搜尋想要的曲目，複製樂譜頁面的網址；或直接在 LibreScore App 內搜尋。
+3. 在 LibreScore 內匯出為 `.mxl`（MusicXML）或 `.mid`（MIDI）。
+4. 把下載的檔案從 NTE Piano「檔案 → 匯入」進去，後續自動移調、分手、摺八度都會幫你處理。
 
-> 也可以使用 NPM 上的 [`dl-librescore`](https://www.npmjs.com/package/dl-librescore) 在命令列批次下載。請尊重原作者與譜面上傳者的版權，僅用於個人非商業練習用途。
+> 純命令列使用者也可以改用 NPM 上的 [`dl-librescore`](https://www.npmjs.com/package/dl-librescore) 直接貼網址下載。請尊重原作者與譜面上傳者的版權，僅用於個人非商業練習用途。
 
 ---
 
