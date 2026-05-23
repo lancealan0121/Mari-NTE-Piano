@@ -90,6 +90,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QProgressDialog,
     QPushButton,
     QScrollBar,
     QSizePolicy,
@@ -146,6 +147,13 @@ from nte_automation import (
 )
 from nte_checker import NTECheckerProbe, NTECheckerState, NTECheckerWidget
 from nte_settings_panel import SettingsPanel, build_panel_qss
+from nte_updater import (
+    CheckUpdateTask,
+    DownloadUpdateTask,
+    UpdateInfo,
+    UpdaterProxy,
+)
+from nte_version import APP_VERSION, GITHUB_REPO_URL
 
 
 APP_TITLE = "NTE Piano Auto Player"
@@ -210,7 +218,7 @@ def _seed_default_songs() -> None:
 
 SETTINGS_DIR = Path.home() / ".nte_piano"
 SETTINGS_PATH = SETTINGS_DIR / "settings.json"
-SETTINGS_VERSION = 19
+SETTINGS_VERSION = 20
 PLAYBACK_SPEEDS = (0.5, 0.75, 1.0, 1.25, 1.5)
 ZOOM_MIN = 0.4
 ZOOM_MAX = 3.0
@@ -509,6 +517,12 @@ class SettingsManager:
         # Ctrl+滾輪縮放音樂編輯區的平滑過渡動畫。140ms OutCubic,連續滾時累加目標。
         # False:回到舊行為 — set_zoom_factor 直接生效、無過渡。
         "smooth_zoom_pianoroll": True,
+        # 啟動 5 秒後背景查 GitHub Releases latest tag,有新版會跳提示對話框。
+        # 6 小時節流(last_update_check_ts)避免頻繁打 API;主人按「略過此版本」
+        # 會寫入 update_skip_version,該版本以前的自動提示會被吃掉(手動檢查不受影響)。
+        "auto_update_check": True,
+        "last_update_check_ts": 0,
+        "update_skip_version": "",
     }
 
     # 「執行中功能」開關 — 每次啟動強制歸 False,不論 settings.json 上次存什麼。
@@ -651,6 +665,10 @@ class SettingsManager:
             pass
         if version < 19:
             # v18→v19: 新增 custom_note_{h,m,l}_color + custom style。沿用 _DEFAULTS。
+            pass
+        if version < 20:
+            # v19→v20: 新增 auto_update_check / last_update_check_ts / update_skip_version。
+            # 三者沿用 _DEFAULTS,不需遷移舊值。
             pass
         data["version"] = SETTINGS_VERSION
         return data
@@ -3487,6 +3505,14 @@ class PianoPlayerWindow(QMainWindow):
         # backwards-compat 角色,新 code 一律當 True。
         self._automation_proxy = AutomationProxy()
         self._automation_task: AutomationTask | None = None
+        # 自動更新 worker:沿用 AutomationProxy 模式,threading.Thread + QObject
+        # signal,跨執行緒走 QueuedConnection,跟自動化任務同款。
+        self._updater_proxy = UpdaterProxy()
+        self._update_check_task: CheckUpdateTask | None = None
+        self._update_download_task: DownloadUpdateTask | None = None
+        self._update_progress_dialog: QProgressDialog | None = None
+        self._pending_update_info: UpdateInfo | None = None
+        self._manual_update_check_pending: bool = False
         # 失焦自動靜音 muter:獨立於 task,跟 task 並行運作,主人切到別的視窗時
         # 自動把 HTGame.exe 設 mute。pycaw 缺套件時 BackgroundAudioMuter
         # is_available() 為 False,GUI 端會 disable 對應選項。
@@ -3572,8 +3598,12 @@ class PianoPlayerWindow(QMainWindow):
                 if hasattr(self, "_settings_panel"):
                     self._settings_panel.refresh_from_settings()
 
+        # 啟動 5 秒後背景查 GitHub Releases,UI 此時已經顯示完;6 小時節流寫在
+        # _maybe_auto_check_update 內,跳過時不會打 API。
+        QTimer.singleShot(5000, self._maybe_auto_check_update)
+
     def _build_ui(self) -> None:
-        self.setWindowTitle(APP_TITLE)
+        self.setWindowTitle(f"{APP_TITLE} v{APP_VERSION}")
         self.resize(1280, 760)
         self.setStyleSheet(self._stylesheet())
         self._animations_enabled = True
@@ -3711,6 +3741,16 @@ class PianoPlayerWindow(QMainWindow):
         self.act_auto_dock.setChecked(
             bool(self._settings.get("automation_dock_visible", True))
         )
+        # 說明區塊:檢查更新、自動檢查 toggle、關於對話框。
+        # 放在 file_menu 內(不另開頂層按鈕)以維持工具列既有視覺。
+        self.file_menu.addSeparator()
+        self.act_check_update = self.file_menu.addAction("檢查更新…")
+        self.act_auto_update_check = self.file_menu.addAction("啟動時自動檢查更新")
+        self.act_auto_update_check.setCheckable(True)
+        self.act_auto_update_check.setChecked(
+            bool(self._settings.get("auto_update_check", True))
+        )
+        self.act_about = self.file_menu.addAction("關於 NTE Piano…")
         self.file_button.setMenu(self.file_menu)
         toolbar.addWidget(self.file_button)
 
@@ -3914,6 +3954,25 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         self.act_auto_dock.toggled.connect(self._on_automation_dock_toggled)
         self._automation_dock.visibilityChanged.connect(
             self._on_automation_dock_visibility
+        )
+        # 自動更新:CheckUpdateTask / DownloadUpdateTask 在 worker thread,
+        # signal 走 QueuedConnection 回 main thread,跟 AutomationProxy 同款。
+        self._updater_proxy.check_finished.connect(
+            self._on_update_check_finished, Qt.QueuedConnection
+        )
+        self._updater_proxy.download_progress.connect(
+            self._on_update_download_progress, Qt.QueuedConnection
+        )
+        self._updater_proxy.download_finished.connect(
+            self._on_update_download_finished, Qt.QueuedConnection
+        )
+        self._updater_proxy.failed.connect(
+            self._on_update_failed, Qt.QueuedConnection
+        )
+        self.act_check_update.triggered.connect(self._on_check_update_clicked)
+        self.act_about.triggered.connect(self._show_about_dialog)
+        self.act_auto_update_check.toggled.connect(
+            self._on_auto_update_check_toggled
         )
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self._toggle_automation_dock)
         self.speed_combo.activated.connect(self._on_speed_selected)
@@ -5643,7 +5702,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
     def _update_title(self) -> None:
         name = self._current_file.name if self._current_file else "未命名"
         dirty = "*" if self._dirty else ""
-        self.setWindowTitle(f"{dirty}{name} — {APP_TITLE}")
+        self.setWindowTitle(f"{dirty}{name} — {APP_TITLE} v{APP_VERSION}")
 
     def _confirm_discard_changes(self) -> bool:
         if not self._dirty:
@@ -6855,6 +6914,198 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             self.statusBar().showMessage("自動化結束", 3000)
             self._append_automation_log("自動化結束")
 
+    # ----- 自動更新 -----
+    # 流程:_maybe_auto_check_update (啟動 5 秒後)/_on_check_update_clicked
+    # (手動) → _start_update_check → CheckUpdateTask (worker thread)
+    # → _on_update_check_finished → 用 QMessageBox 提示三個選項
+    # → _start_update_download → DownloadUpdateTask → 進度條
+    # → _on_update_download_finished → 啟 installer + quit
+
+    def _maybe_auto_check_update(self) -> None:
+        if not bool(self._settings.get("auto_update_check", True)):
+            return
+        try:
+            last_ts = int(self._settings.get("last_update_check_ts", 0) or 0)
+        except (TypeError, ValueError):
+            last_ts = 0
+        # 6 小時 = 21600 秒。GitHub 未認證 60 req/h/IP,綽綽有餘。
+        if time.time() - last_ts < 21600:
+            return
+        self._start_update_check(manual=False)
+
+    @Slot()
+    def _on_check_update_clicked(self) -> None:
+        self._start_update_check(manual=True)
+
+    def _start_update_check(self, manual: bool) -> None:
+        if self._update_check_task is not None and self._update_check_task.is_alive():
+            if manual:
+                self.statusBar().showMessage("正在檢查更新…", 3000)
+            return
+        self._manual_update_check_pending = bool(manual)
+        self._settings.set("last_update_check_ts", int(time.time()))
+        task = CheckUpdateTask(self._updater_proxy)
+        self._update_check_task = task
+        task.start()
+        if manual:
+            self.statusBar().showMessage("正在檢查更新…", 3000)
+
+    @Slot(object)
+    def _on_update_check_finished(self, info) -> None:
+        manual = self._manual_update_check_pending
+        self._manual_update_check_pending = False
+        self._update_check_task = None
+        if info is None:
+            if manual:
+                QMessageBox.information(
+                    self, "檢查更新", "已是最新版本喵 (=^･ω･^=)"
+                )
+            return
+        # 自動檢查時,曾按過「略過此版本」就跳過。手動點擊一律顯示。
+        skip = str(self._settings.get("update_skip_version", "") or "")
+        if not manual and skip and info.latest_version == skip:
+            return
+        self._pending_update_info = info
+        self._show_update_prompt(info)
+
+    def _show_update_prompt(self, info: UpdateInfo) -> None:
+        size_mb = info.asset_size / (1024 * 1024) if info.asset_size else 0.0
+        size_str = f"{size_mb:.1f} MB" if size_mb else "未知大小"
+        digest_note = "" if info.digest else "\n\n注意:此版本未提供 SHA256 校驗碼。"
+        text = (
+            f"發現新版本 v{info.latest_version}\n"
+            f"目前版本 v{info.current_version}\n\n"
+            f"檔案:{info.asset_name} ({size_str}){digest_note}"
+        )
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("有可用的更新")
+        box.setText(text)
+        btn_download = box.addButton("立即下載", QMessageBox.AcceptRole)
+        btn_skip = box.addButton("略過此版本", QMessageBox.DestructiveRole)
+        btn_later = box.addButton("稍後提醒", QMessageBox.RejectRole)
+        box.setDefaultButton(btn_download)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is btn_download:
+            self._start_update_download(info)
+        elif clicked is btn_skip:
+            self._settings.set("update_skip_version", info.latest_version)
+        # btn_later 或關閉:不動 settings,下次啟動再提示。
+
+    def _start_update_download(self, info: UpdateInfo) -> None:
+        if self._update_download_task is not None and self._update_download_task.is_alive():
+            return
+        import tempfile
+        dest_dir = Path(tempfile.gettempdir())
+        task = DownloadUpdateTask(self._updater_proxy, info, dest_dir)
+        self._update_download_task = task
+
+        dialog = QProgressDialog(
+            f"正在下載 v{info.latest_version}…", "取消", 0, max(info.asset_size, 1), self
+        )
+        dialog.setWindowTitle("下載更新")
+        dialog.setWindowModality(Qt.WindowModal)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.canceled.connect(self._cancel_update_download)
+        self._update_progress_dialog = dialog
+        dialog.show()
+
+        task.start()
+
+    @Slot()
+    def _cancel_update_download(self) -> None:
+        task = self._update_download_task
+        if task is not None:
+            try:
+                task.request_stop()
+            except Exception:
+                pass
+
+    @Slot(int, int)
+    def _on_update_download_progress(self, done: int, total: int) -> None:
+        dialog = self._update_progress_dialog
+        if dialog is None:
+            return
+        if total > 0:
+            dialog.setMaximum(total)
+            dialog.setValue(done)
+        else:
+            dialog.setMaximum(0)
+        done_mb = done / (1024 * 1024)
+        total_mb = total / (1024 * 1024)
+        if total > 0:
+            dialog.setLabelText(f"已下載 {done_mb:.1f} / {total_mb:.1f} MB")
+        else:
+            dialog.setLabelText(f"已下載 {done_mb:.1f} MB")
+
+    @Slot(str)
+    def _on_update_download_finished(self, path: str) -> None:
+        self._update_download_task = None
+        if self._update_progress_dialog is not None:
+            self._update_progress_dialog.close()
+            self._update_progress_dialog = None
+        info = self._pending_update_info
+        # 若 release 沒帶 digest,先給警告讓主人決定是否仍要安裝。
+        if info is not None and info.digest is None:
+            warn = QMessageBox.warning(
+                self,
+                "未提供校驗碼",
+                "此版本未提供 SHA256 校驗碼,無法核對檔案完整性。\n"
+                "建議到 GitHub 比對檔案 hash 後再安裝。\n\n是否仍要繼續安裝?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if warn != QMessageBox.Yes:
+                return
+        confirm = QMessageBox.question(
+            self,
+            "下載完成",
+            "更新安裝檔已下載完成,是否關閉 NTE Piano 並啟動安裝?\n"
+            "(系統會跳出 UAC 確認視窗)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        try:
+            # DETACHED_PROCESS:讓 installer 脫離本程式生命週期,quit() 之後仍能跑。
+            subprocess.Popen(
+                [path],
+                creationflags=subprocess.DETACHED_PROCESS
+                | subprocess.CREATE_NEW_PROCESS_GROUP,
+                close_fds=True,
+            )
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "啟動安裝失敗", str(e))
+            return
+        QApplication.instance().quit()
+
+    @Slot(str)
+    def _on_update_failed(self, message: str) -> None:
+        self._update_download_task = None
+        if self._update_progress_dialog is not None:
+            self._update_progress_dialog.close()
+            self._update_progress_dialog = None
+        QMessageBox.critical(self, "更新失敗", message)
+
+    @Slot(bool)
+    def _on_auto_update_check_toggled(self, checked: bool) -> None:
+        self._settings.set("auto_update_check", bool(checked))
+
+    @Slot()
+    def _show_about_dialog(self) -> None:
+        QMessageBox.about(
+            self,
+            "關於 NTE Piano",
+            f"<b>{APP_TITLE}</b><br>"
+            f"版本 v{APP_VERSION}<br><br>"
+            f"NTE 遊戲鋼琴介面自動演奏工具<br>"
+            f'<a href="{GITHUB_REPO_URL}">{GITHUB_REPO_URL}</a>',
+        )
+
     def _append_automation_log(self, message: str) -> None:
         """把訊息以 [HH:MM:SS] 字首寫進底部 log。
 
@@ -6923,6 +7174,19 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
                 pass
         # autosave 機制已移除,_dirty 只用於關閉時提示(`_confirm_discard_changes`)
         self._hotkeys.stop()
+        # 自動更新 worker 跟 download worker:跟其他 daemon thread 一樣請它停。
+        if self._update_check_task is not None:
+            try:
+                self._update_check_task.request_stop()
+            except Exception:
+                pass
+            self._update_check_task = None
+        if self._update_download_task is not None:
+            try:
+                self._update_download_task.request_stop()
+            except Exception:
+                pass
+            self._update_download_task = None
         if self._automation_task is not None:
             try:
                 self._automation_task.request_stop()
