@@ -4998,7 +4998,14 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            text = path.read_text(encoding="utf-8-sig")
+            try:
+                text = path.read_text(encoding="utf-8-sig")
+            except UnicodeDecodeError as exc:
+                self._show_error(
+                    "載入失敗",
+                    f"無法以 UTF-8 解碼:{path.name}\n請確認檔案是文字譜面而非二進位檔。\n\n{exc}",
+                )
+                return
         except OSError as exc:
             self._show_error("載入失敗", str(exc))
             return
@@ -5006,7 +5013,10 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         try:
             sheet = SheetParser.parse(text)
         except Exception as exc:  # noqa: BLE001
-            self._show_error("譜面解析失敗", str(exc))
+            self._show_error(
+                "譜面解析失敗",
+                f"{path.name} 不是有效的譜面文字檔。\n\n{exc}",
+            )
             return
 
         self._current_file = path
@@ -5086,10 +5096,11 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             "匯入譜面",
             str(Path.cwd()),
             (
-                "所有支援格式 (*.mxl *.xml *.musicxml *.mid *.midi *.mscz *.mscx);;"
+                "所有支援格式 (*.mxl *.xml *.musicxml *.mid *.midi *.mscz *.mscx *.txt *.score);;"
                 "MusicXML (*.mxl *.xml *.musicxml);;"
                 "MIDI (*.mid *.midi);;"
                 "MuseScore (*.mscz *.mscx);;"
+                "Text score (*.txt *.score);;"
                 "All files (*.*)"
             ),
         )
@@ -5103,9 +5114,11 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             self._import_midi_path(path)
         elif suffix in MSCZ_EXTENSIONS:
             self._import_mscz_path(path)
+        elif suffix in DSL_EXTENSIONS:
+            self._load_file(path)
         else:
             self.statusBar().showMessage(
-                f"不支援的檔案格式:{suffix}(僅支援 mxl / xml / musicxml / mid / midi / mscz / mscx)",
+                f"不支援的檔案格式:{suffix}(僅支援 mxl / xml / musicxml / mid / midi / mscz / mscx / txt / score)",
                 4000,
             )
 

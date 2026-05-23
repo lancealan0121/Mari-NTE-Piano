@@ -1,6 +1,6 @@
 # 言って。(Say it.)
 # composer: ヨルシカ (Yorushika)
-# imported from 言って。(Say it.) – ヨルシカ(Yorushika).musicxml; transpose +0 semitones; divisions=12; fifths=0; mode=dense
+# imported from tmpighdk3j8.musicxml; transpose +0 semitones; divisions=12; fifths=0; mode=dense
 
 tempo 180
 beat 0.0833333
