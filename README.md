@@ -8,6 +8,10 @@
   <strong>NTE 遊戲鋼琴介面的視覺化編輯與自動演奏桌面工具。</strong>
 </p>
 
+<p align="center">
+  <strong>繁體中文</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
 ![NTE Piano 主介面：Overview 縮略圖、Piano Roll 卷簾與仿遊戲 36 鍵鋼琴](assets/ss1.png)
 
 > **小聲說明**：作者的程式設計經驗還在累積中，本專案有相當比例的程式碼是與 AI 協同撰寫的，難免有不夠優雅或不夠嚴謹之處。看到任何問題、想法、改進建議，都非常歡迎透過 issue / PR 回報，會很感激 QQ
