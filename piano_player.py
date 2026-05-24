@@ -147,6 +147,8 @@ from nte_automation import (
 )
 from nte_checker import NTECheckerProbe, NTECheckerState, NTECheckerWidget
 from nte_settings_panel import SettingsPanel, build_panel_qss
+from nte_audio import PianoSoundPlayer
+from nte_perf import perf, init_perf_from_env
 from nte_updater import (
     CheckUpdateTask,
     DownloadUpdateTask,
@@ -218,7 +220,7 @@ def _seed_default_songs() -> None:
 
 SETTINGS_DIR = Path.home() / ".nte_piano"
 SETTINGS_PATH = SETTINGS_DIR / "settings.json"
-SETTINGS_VERSION = 20
+SETTINGS_VERSION = 21
 PLAYBACK_SPEEDS = (0.5, 0.75, 1.0, 1.25, 1.5)
 ZOOM_MIN = 0.4
 ZOOM_MAX = 3.0
@@ -523,6 +525,14 @@ class SettingsManager:
         "auto_update_check": True,
         "last_update_check_ts": 0,
         "update_skip_version": "",
+        # v21:本機鋼琴音色播放(assets/sounds/piano/*.ogg)。
+        # piano_sound_enabled:播放譜面時是否同步用 QSoundEffect 出聲;關掉就只送鍵不發聲。
+        # piano_sound_volume:0.0~1.0,UI 用 0~100 slider 內部 /100 落盤。
+        # preview_mode:預先聆聽模式 — worker 走完整 schedule 但不送任何鍵、不聚焦遊戲視窗,
+        # 只發本機音。屬於「執行中功能」,_RESET_ON_LOAD 強制每次啟動歸 False。
+        "piano_sound_enabled": True,
+        "piano_sound_volume": 0.7,
+        "preview_mode": False,
     }
 
     # 「執行中功能」開關 — 每次啟動強制歸 False,不論 settings.json 上次存什麼。
@@ -534,6 +544,7 @@ class SettingsManager:
         "automation_dock_visible",
         "heist_enabled",
         "heist_auto_mode",
+        "preview_mode",
     )
 
     def __init__(self, path: Path = SETTINGS_PATH) -> None:
@@ -670,6 +681,10 @@ class SettingsManager:
             # v19→v20: 新增 auto_update_check / last_update_check_ts / update_skip_version。
             # 三者沿用 _DEFAULTS,不需遷移舊值。
             pass
+        if version < 21:
+            # v20→v21: 新增 piano_sound_enabled / piano_sound_volume / preview_mode。
+            # 沿用 _DEFAULTS;preview_mode 由 _RESET_ON_LOAD 每次啟動歸 False。
+            pass
         data["version"] = SETTINGS_VERSION
         return data
 
@@ -685,6 +700,22 @@ class SettingsManager:
             return
         self._data[key] = value
         self._save()
+
+    def defer_set(self, key: str, value) -> None:
+        """更新內部值但不立刻落盤;由 caller 用 QTimer 在 idle 後呼叫 flush() 寫盤。
+
+        用途:slider 拖動連續 emit 時避免每像素都寫 atomic file。
+        """
+        if self._data.get(key) == value:
+            return
+        self._data[key] = value
+        self._pending_flush = True
+
+    def flush(self) -> None:
+        """如有未落盤的 defer_set 內容,寫入磁碟一次。"""
+        if getattr(self, "_pending_flush", False):
+            self._pending_flush = False
+            self._save()
 
     def _save(self) -> None:
         try:
@@ -750,6 +781,30 @@ class PianoKeyboardWidget(QWidget):
             if self._anim_state and not self._anim_timer.isActive():
                 self._anim_timer.start()
         self._active = new_set
+        self.update()
+
+    @Slot(object)
+    def apply_active_delta(self, delta) -> None:
+        """高頻路徑:接 worker.active_delta(adds, removes),只動差集 + update。
+
+        避免每次 down/up 都跨 thread 跑 sorted full set。
+        """
+        adds, removes = delta
+        if not adds and not removes:
+            return
+        if perf.enabled:
+            perf.log("gui", "kb_delta", adds=len(adds), removes=len(removes))
+        if self._animations_enabled:
+            now = time.perf_counter()
+            for lbl in adds:
+                self._anim_state[lbl] = {"active_since": now, "released_at": None}
+            for lbl in removes:
+                st = self._anim_state.setdefault(lbl, {"active_since": now})
+                st["released_at"] = now
+            if self._anim_state and not self._anim_timer.isActive():
+                self._anim_timer.start()
+        self._active.update(adds)
+        self._active.difference_update(removes)
         self.update()
 
     def _on_anim_tick(self) -> None:
@@ -1354,6 +1409,22 @@ class PianoRollView(QWidget):
             for lbl in new_set - self._active_labels:
                 self._label_pulse_starts[lbl] = now
         self._active_labels = new_set
+        self.update()
+
+    @Slot(object)
+    def apply_active_delta(self, delta) -> None:
+        """高頻路徑:接 worker.active_delta(adds, removes),只動差集 + update。"""
+        adds, removes = delta
+        if not adds and not removes:
+            return
+        if perf.enabled:
+            perf.log("gui", "roll_delta", adds=len(adds), removes=len(removes))
+        if self._animations_enabled and adds:
+            now = time.perf_counter()
+            for lbl in adds:
+                self._label_pulse_starts[lbl] = now
+        self._active_labels.update(adds)
+        self._active_labels.difference_update(removes)
         self.update()
 
     def set_animations_enabled(self, enabled: bool) -> None:
@@ -3454,6 +3525,15 @@ class PianoPlayerWindow(QMainWindow):
     AUTOSAVE_PATH = _user_data_dir("autosave.txt")
     IMPORT_LOG_PATH = _user_data_dir("logs/import_error.log")
 
+    # 高頻 slider 類 setting key:_on_panel_setting_changed 走 defer_set + 300ms flush。
+    # 其他 toggle/combo key 立刻寫盤,維持原本的「按一下就落地」語意。
+    _SETTINGS_DEBOUNCE_KEYS = frozenset({
+        "playback_speed", "zoom_factor", "countdown_seconds",
+        "piano_sound_volume",
+        "dodge_threshold", "dodge_counter_threshold",
+        "rhythm_loop_count", "rhythm_timeout_seconds", "rhythm_delay_ms",
+    })
+
     def __init__(self, initial_file=None):
         super().__init__()
         self._current_file = None
@@ -3501,6 +3581,20 @@ class PianoPlayerWindow(QMainWindow):
         if self._roll_fps not in (30, 60, 120):
             self._roll_fps = 60
         self._show_piano_keyboard = bool(self._settings.get("show_piano_keyboard", True))
+        # 本機鋼琴音色 player:跟著 PlaybackWorker.note_pressed signal 出聲。
+        # 預先聆聽模式(preview_mode)時 worker 走 silent_mode,不送鍵但仍 emit
+        # note_pressed,因此這個 player 是「聽得到自己排的譜」唯一通道。
+        self._preview_mode = bool(self._settings.get("preview_mode", False))
+        self._sound_player = PianoSoundPlayer(_resource_path("assets/sounds/piano"))
+        self._sound_player.set_enabled(bool(self._settings.get("piano_sound_enabled", True)))
+        self._sound_player.set_volume(float(self._settings.get("piano_sound_volume", 0.7)))
+
+        # 高頻 slider 類設定的寫盤 debounce(300ms);拖 slider 連續變動時暫存,
+        # 停手後一次 atomic-write settings.json。closeEvent / _play_sheet 前都會 flush。
+        self._settings_flush_timer = QTimer(self)
+        self._settings_flush_timer.setSingleShot(True)
+        self._settings_flush_timer.setInterval(300)
+        self._settings_flush_timer.timeout.connect(self._on_settings_flush_timer)
         # F10/F11 全域熱鍵恆啟用,不再給開關。舊欄位/setting key 仍存在但只剩
         # backwards-compat 角色,新 code 一律當 True。
         self._automation_proxy = AutomationProxy()
@@ -3708,6 +3802,7 @@ class PianoPlayerWindow(QMainWindow):
         self.file_button.setMinimumWidth(96)
         self.file_button.setToolTip("檔案操作（開啟 / 儲存 / 匯入 / 自動化）")
         self.file_menu = QMenu(self.file_button)
+        self.act_new = self.file_menu.addAction("新增空樂譜\tCtrl+N")
         self.act_open = self.file_menu.addAction("開啟…\tCtrl+O")
         self.file_menu.addSeparator()
         self.act_save = self.file_menu.addAction("儲存\tCtrl+S")
@@ -3927,6 +4022,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         self.prev_button.clicked.connect(self.seek_to_start)
         self.next_button.clicked.connect(self.seek_to_end)
         self.act_open.triggered.connect(self.open_score)
+        self.act_new.triggered.connect(self.new_score)
         self.act_save.triggered.connect(self.save_score)
         self.act_save_as.triggered.connect(self.save_score_as)
         self.act_import.triggered.connect(self.import_score)
@@ -4006,6 +4102,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             ("Ctrl+S", self.save_score),
             ("Ctrl+Shift+S", self.save_score_as),
             ("Ctrl+O", self.open_score),
+            ("Ctrl+N", self.new_score),
             ("Ctrl+I", self.import_musicxml),
             ("Esc", self._close_dock),
         ):
@@ -4290,6 +4387,8 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
     def _on_note_clicked(self, label: str) -> None:
         if self._worker is not None or self._sheet is None:
             return
+        if perf.enabled:
+            perf.log("gui", "note_click", label=label)
         stroke = self._stroke_from_label(label)
         if stroke is None:
             return
@@ -4334,6 +4433,9 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         self._update_scrollbar_range()
         if hasattr(self, "overview_bar"):
             self.overview_bar.set_sheet(self._sheet)
+        # 編輯試聽:點 piano_keyboard 加音時就讓本機鋼琴出聲一下。
+        # sound_player.set_enabled(False) 時 play() 是 no-op,自動跟隨總開關。
+        self._sound_player.play(label)
         self.statusBar().showMessage(
             f"加入 {label}（main 軌，起始 {start_beats:g} beat，長度 {default_duration:g} beat）",
             2000,
@@ -5137,6 +5239,26 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         self._import_musicxml_path(Path(filename))
 
     @Slot()
+    def new_score(self) -> None:
+        """建立一份空樂譜。不落盤,在歌曲下拉顯示 (未存檔) 新樂譜,Ctrl+S 可另存。"""
+        if not self._confirm_discard_changes():
+            return
+        try:
+            sheet = SheetParser.parse("tempo 120\nbeat 0.25\n")
+        except Exception as exc:  # noqa: BLE001
+            self._show_error("新增失敗", str(exc))
+            return
+        self._current_file = None
+        self._dirty = True
+        self._imported_source_name = None
+        self._clear_loop_range()
+        self._apply_sheet(sheet)
+        self._unsaved_combo_title = "新樂譜"
+        self._update_title()
+        self._populate_song_combo()
+        self.statusBar().showMessage("已建立空樂譜(未存檔),按 Ctrl+S 存入 songs/", 5000)
+
+    @Slot()
     def open_score(self) -> None:
         if not self._confirm_discard_changes():
             return
@@ -5311,6 +5433,14 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         self._play_sheet(self._sheet)
 
     def _play_sheet(self, sheet: Sheet) -> None:
+        if perf.enabled:
+            perf.log(
+                "gui",
+                "play_sheet",
+                events=len(sheet.events),
+                preview=self._preview_mode,
+                speed=self._playback_speed,
+            )
         self._sheet = sheet
         self.piano_roll.set_sheet(sheet)
         self.piano_roll.set_playback_speed(self._playback_speed)
@@ -5320,7 +5450,10 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         target_window = find_game_window()
         target_hwnd = None
         focus_before_play = False
-        if self._focus_game_on_play and target_window is not None:
+        # 編輯模式:不碰遊戲視窗,worker 走 silent_mode 不送任何鍵,只發本機音。
+        if self._preview_mode:
+            self.statusBar().showMessage("編輯模式:不送鍵,只發本機鋼琴音色", 4000)
+        elif self._focus_game_on_play and target_window is not None:
             target_hwnd = target_window.hwnd
             focus_before_play = True
             self.statusBar().showMessage(
@@ -5359,6 +5492,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             speed=self._playback_speed,
             auto_trim_leading=self._auto_trim_leading_silence,
             loop_end_seconds=loop_end_for_worker,
+            silent_mode=self._preview_mode,
         )
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
@@ -5366,6 +5500,14 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         self._worker.progress.connect(self._on_playback_progress, Qt.QueuedConnection)
         self._worker.active_notes.connect(self.piano_keyboard.set_active_labels, Qt.QueuedConnection)
         self._worker.active_notes.connect(self.piano_roll.set_active_labels, Qt.QueuedConnection)
+        # delta 路徑:down/up 高頻 emit (adds, removes),widget 只動差集 + update。
+        # set_active_labels 留給「全清/seek 重設」場景,行為不變。
+        self._worker.active_delta.connect(self.piano_keyboard.apply_active_delta, Qt.QueuedConnection)
+        self._worker.active_delta.connect(self.piano_roll.apply_active_delta, Qt.QueuedConnection)
+        # 編輯模式 on 時 GUI 才出聲;off 時遊戲負責出聲,避免遊戲 + GUI 雙重聲。
+        # piano_sound_enabled 為總開關,off 時連線了也不會出聲(sound_player.set_enabled)。
+        if self._preview_mode:
+            self._worker.note_pressed.connect(self._sound_player.play_chord, Qt.QueuedConnection)
         self._worker.failed.connect(self._on_playback_failed, Qt.QueuedConnection)
         self._worker.finished.connect(self._on_playback_finished, Qt.QueuedConnection)
         self._worker.finished.connect(self._thread.quit, Qt.QueuedConnection)
@@ -5445,6 +5587,12 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
                 self._thread.quit()
                 self._thread.wait(500)
 
+    @Slot()
+    def _on_settings_flush_timer(self) -> None:
+        if perf.enabled:
+            perf.log("gui", "settings_flush")
+        self._settings.flush()
+
     @Slot(int, str, object)
     def _on_playback_progress(self, _index: int, token: str, _labels) -> None:
         self.statusBar().showMessage(f"播放：{token}", 800)
@@ -5475,9 +5623,18 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
                auto_trim_leading_silence / import_tempo_changes:更新對應 flag
         """
         # *_active 不寫入 settings.json,屬於 runtime 開關。其餘照寫。
+        # 高頻 slider 類 key 走 defer_set + QTimer flush(300ms debounce),
+        # 拖動時不會每像素 atomic-write settings.json。
         runtime_only = {"dodge_active", "rhythm_active"}
+        if perf.enabled:
+            debounced = key in self._SETTINGS_DEBOUNCE_KEYS
+            perf.log("gui", "setting_change", key=key, value=value, debounced=debounced)
         if key not in runtime_only:
-            self._settings.set(key, value)
+            if key in self._SETTINGS_DEBOUNCE_KEYS:
+                self._settings.defer_set(key, value)
+                self._settings_flush_timer.start()
+            else:
+                self._settings.set(key, value)
 
         # heist 設定變動:把整份 config push 到 controller,並依 pickup_enabled
         # 決定 controller 啟停。
@@ -5553,6 +5710,19 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             return
         if key == "focus_game_on_play":
             self._focus_game_on_play = bool(value)
+            return
+        if key == "piano_sound_enabled":
+            self._sound_player.set_enabled(bool(value))
+            return
+        if key == "piano_sound_volume":
+            self._sound_player.set_volume(float(value))
+            return
+        if key == "preview_mode":
+            self._preview_mode = bool(value)
+            if self._worker is not None:
+                self.statusBar().showMessage(
+                    "編輯模式變更會在下一次播放生效", 3000
+                )
             return
         if key == "auto_pause_on_focus_loss":
             self._on_focus_loss_pause_changed(bool(value))
@@ -7158,6 +7328,10 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         if not self._confirm_discard_changes():
             event.ignore()
             return
+        # debounce 中的 slider 寫盤強制落地,免得 300ms 視窗內關掉就丟資料。
+        if hasattr(self, "_settings_flush_timer"):
+            self._settings_flush_timer.stop()
+        self._settings.flush()
         # 視窗關閉時 dock 會自動 hide,不應視為使用者主動隱藏 → 把 visibilityChanged
         # 訊號斷開,免得把 settings 的 automation_dock_visible 寫成 False。
         if hasattr(self, "_automation_dock") and self._automation_dock is not None:
@@ -7231,6 +7405,11 @@ def parse_args(argv):
 
 def main(argv=None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    # NTE_PERF=1 啟用效能日誌,寫到使用者目錄 logs/perf_*.log。在 _seed_default_songs
+    # 之前打開,連啟動順序都能記錄。
+    perf_path = init_perf_from_env(_user_data_dir("logs"))
+    if perf_path is not None:
+        print(f"[nte_perf] logging to {perf_path}", file=sys.stderr)
     # 首次啟動把 bundled 預設譜面 copy 到使用者 songs/。frozen / dev 都要跑;
     # dev 時 _resource_path 跟 _user_data_dir 同一個目錄,seed 會 no-op。
     _seed_default_songs()

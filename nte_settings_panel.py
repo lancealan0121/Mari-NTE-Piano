@@ -713,6 +713,7 @@ class SettingsPanel(QWidget):
 
     def _build_groups(self) -> None:
         self._build_playback_group()
+        self._build_piano_sound_group()
         self._build_visual_group()
         self._build_focus_group()
         self._build_import_group()
@@ -756,6 +757,39 @@ class SettingsPanel(QWidget):
             "countdown_seconds", countdown,
             lambda: int(round(countdown.value())), lambda v: countdown.set_value(float(v))
         )
+
+    def _build_piano_sound_group(self) -> None:
+        g = self._add_group("鋼琴音色")
+
+        enable = ToggleSwitchRow("啟用鋼琴音色(編輯試聽/編輯模式)")
+        enable.setChecked(bool(self._get("piano_sound_enabled", True)))
+        enable.toggled.connect(lambda c: self._emit("piano_sound_enabled", bool(c)))
+        g.addWidget(enable, 0, 0, 1, 2)
+        self._register(
+            "piano_sound_enabled", enable, enable.isChecked, enable.setChecked
+        )
+
+        # 內部存 0.0~1.0 float;UI 用 0~100 slider 直覺一點。
+        volume = LabeledSlider("音量", 0, 100, 1, decimals=0, suffix=" %")
+        volume.set_value(int(round(float(self._get("piano_sound_volume", 0.7)) * 100)))
+        volume.value_changed.connect(
+            lambda v: self._emit("piano_sound_volume", round(float(v) / 100.0, 3))
+        )
+        g.addWidget(volume, 1, 0, 1, 2)
+        self._register(
+            "piano_sound_volume",
+            volume,
+            lambda: round(float(volume.value()) / 100.0, 3),
+            lambda v: volume.set_value(float(v) * 100.0),
+        )
+
+        # 編輯模式:播放時 worker 走 silent_mode 不送鍵,只發本機音。off 時遊戲送鍵,
+        # GUI 不重複出聲(避免遊戲 + GUI 雙重聲)。「執行中」開關 — 每次啟動歸 False。
+        preview = ToggleSwitchRow("編輯模式(播放時不送鍵,GUI 出聲)")
+        preview.setChecked(bool(self._get("preview_mode", False)))
+        preview.toggled.connect(lambda c: self._emit("preview_mode", bool(c)))
+        g.addWidget(preview, 2, 0, 1, 2)
+        self._register("preview_mode", preview, preview.isChecked, preview.setChecked)
 
     def _build_visual_group(self) -> None:
         g = self._add_group("視覺")

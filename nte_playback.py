@@ -39,6 +39,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
 
 from nte_dsl import KeyStroke, NoteEvent, Sheet
+from nte_perf import perf
 
 
 GAME_PROCESS_NAME = "HTGame.exe"
@@ -338,6 +339,21 @@ class PyDirectInputBackend(KeyBackend):
         self._module.keyUp(key)
 
 
+class NullBackend(KeyBackend):
+    """預先聆聽模式用:接收 key_down/up 但不送任何系統事件。
+
+    這樣 PlaybackWorker 的 _chord_down / _release_all 不必到處插
+    `if silent_mode` 條件,靠多型直接接到 no-op 即可。"""
+
+    name = "null"
+
+    def key_down(self, key: str) -> None:  # noqa: D401
+        return None
+
+    def key_up(self, key: str) -> None:  # noqa: D401
+        return None
+
+
 def create_backend(name: str) -> KeyBackend:
     if name == PynputBackend.name:
         return PynputBackend()
@@ -368,6 +384,10 @@ class ScheduledAction:
 class PlaybackWorker(QObject):
     progress = Signal(int, str, object)
     active_notes = Signal(object)
+    # 高頻路徑:每個 down/up emit (adds, removes) tuple,接收端只動 set 差集 + update。
+    # 取代「每次 emit 整份 sorted active set」的 O(N log N) + 跨 thread 重序列化成本。
+    active_delta = Signal(object)
+    note_pressed = Signal(object)
     started = Signal(float)
     failed = Signal(str)
     finished = Signal(bool)
@@ -384,6 +404,7 @@ class PlaybackWorker(QObject):
         speed: float = 1.0,
         auto_trim_leading: bool = True,
         loop_end_seconds: float | None = None,
+        silent_mode: bool = False,
     ):
         super().__init__()
         self._sheet = sheet
@@ -393,6 +414,7 @@ class PlaybackWorker(QObject):
         self._speed = max(0.1, float(speed))
         self._initial_offset = max(0.0, float(initial_offset_seconds)) / self._speed
         self._auto_trim_leading = bool(auto_trim_leading)
+        self._silent_mode = bool(silent_mode)
         # 播放區間結尾(原始秒數,未除 speed);超過此秒數的 action 不送並停止播放。
         # None 表示無限制,跑到譜面結尾為止。
         if loop_end_seconds is None:
@@ -466,8 +488,20 @@ class PlaybackWorker(QObject):
         backend = None
         stopped = False
         try:
-            backend, _ = create_backend_with_fallback()
+            if self._silent_mode:
+                backend = NullBackend()
+            else:
+                backend, _ = create_backend_with_fallback()
             actions = self._build_schedule()
+            if perf.enabled:
+                perf.log(
+                    "worker",
+                    "run_start",
+                    actions=len(actions),
+                    silent=self._silent_mode,
+                    speed=self._speed,
+                    backend=backend.name,
+                )
             # auto-trim leading silence:若譜面首音落在 SKIP_THRESHOLD 之後,把
             # _initial_offset 設成首音秒數,等同把 cursor 快轉到首音前一刻。
             # 只在沒指定 initial_offset(非 seek 場景)且 auto_trim 開啟時生效。
@@ -535,6 +569,15 @@ class PlaybackWorker(QObject):
                 if result == "speed":
                     continue
                 if result == "skip":
+                    if perf.enabled:
+                        perf.log(
+                            "worker",
+                            "skip",
+                            idx=action.event_index,
+                            kind=action.kind,
+                            sched=f"{action.seconds:.3f}",
+                            late_ms=f"{(time.perf_counter() - (self._started_at + action.seconds)) * 1000.0:+.2f}",
+                        )
                     i += 1
                     continue
 
@@ -545,12 +588,52 @@ class PlaybackWorker(QObject):
                         [stroke.label for stroke in action.event.strokes],
                     )
                 elif action.kind == "down":
+                    if perf.enabled:
+                        drift_ms = (time.perf_counter() - (self._started_at + action.seconds)) * 1000.0
+                        perf.log(
+                            "worker",
+                            "down_begin",
+                            idx=action.event_index,
+                            sched=f"{action.seconds:.3f}",
+                            drift=f"{drift_ms:+.2f}",
+                            n=len(action.event.strokes),
+                        )
+                        t_chord = time.perf_counter()
                     self._chord_down(backend, action.event.strokes)
-                    self.active_notes.emit(sorted(self._active_label_counts))
+                    if perf.enabled:
+                        perf.log(
+                            "worker",
+                            "down_end",
+                            idx=action.event_index,
+                            dur_ms=f"{(time.perf_counter() - t_chord) * 1000.0:.2f}",
+                        )
+                    self.note_pressed.emit([stroke.label for stroke in action.event.strokes])
+                    # delta:_chord_down 後 count==1 的 label 表示這次新加入 active set。
+                    adds = [
+                        s.label for s in action.event.strokes
+                        if self._active_label_counts.get(s.label, 0) == 1
+                    ]
+                    if adds:
+                        self.active_delta.emit((adds, []))
                 elif action.kind == "up":
+                    if perf.enabled:
+                        drift_ms = (time.perf_counter() - (self._started_at + action.seconds)) * 1000.0
+                        perf.log(
+                            "worker",
+                            "up_begin",
+                            idx=action.event_index,
+                            sched=f"{action.seconds:.3f}",
+                            drift=f"{drift_ms:+.2f}",
+                            n=len(action.event.strokes),
+                        )
+                    removes = []
                     for stroke in reversed(action.event.strokes):
+                        before = self._active_label_counts.get(stroke.label, 0)
                         self._stroke_up(backend, stroke)
-                    self.active_notes.emit(sorted(self._active_label_counts))
+                        if before == 1 and stroke.label not in self._active_label_counts:
+                            removes.append(stroke.label)
+                    if removes:
+                        self.active_delta.emit(([], removes))
                 i += 1
 
         except Exception as exc:  # noqa: BLE001
@@ -618,6 +701,8 @@ class PlaybackWorker(QObject):
         return actions
 
     def _focus_target_window(self) -> None:
+        if self._silent_mode:
+            return
         if self._target_hwnd and self._focus_before_play:
             try:
                 focus_window(self._target_hwnd)
@@ -627,6 +712,10 @@ class PlaybackWorker(QObject):
     SETTLE_AFTER_RELEASE = 0.03
 
     def _settle_for_key(self, key: str) -> None:
+        # silent_mode 下 NullBackend 不送鍵,settle 是給遊戲鍵盤子系統喘息用的,
+        # 完全沒意義 — 而且 30ms × 密集音 = 整曲累積數秒 drift,後段會 skip 漏音。
+        if self._silent_mode:
+            return
         last = self._last_release_at.get(key)
         if last is None:
             return
@@ -636,17 +725,19 @@ class PlaybackWorker(QObject):
 
     def _stroke_down(self, backend: KeyBackend, stroke: KeyStroke) -> None:
         self._settle_for_key(stroke.key)
+        # modifier_delay 同理:silent_mode 沒送鍵,不需要等遊戲偵測 Shift/Ctrl 邊緣。
+        mod_delay = 0.0 if self._silent_mode else self._sheet.modifier_delay
         for modifier in stroke.modifiers:
             backend.key_down(modifier)
-            if self._sheet.modifier_delay:
-                time.sleep(self._sheet.modifier_delay)
+            if mod_delay:
+                time.sleep(mod_delay)
 
         self._press_active(backend, stroke.key)
         self._active_label_counts[stroke.label] = self._active_label_counts.get(stroke.label, 0) + 1
 
         for modifier in reversed(stroke.modifiers):
-            if self._sheet.modifier_delay:
-                time.sleep(self._sheet.modifier_delay)
+            if mod_delay:
+                time.sleep(mod_delay)
             backend.key_up(modifier)
 
     def _chord_down(self, backend: KeyBackend, strokes) -> None:
@@ -662,29 +753,46 @@ class PlaybackWorker(QObject):
         for stroke in strokes:
             mod_key = tuple(stroke.modifiers)
             groups.setdefault(mod_key, []).append(stroke)
+        if perf.enabled and len(groups) > 1:
+            # 同一 chord 內出現多種 modifier set 表示要切換 shift/ctrl 狀態。
+            # 若同 key 在不同 group 出現,代表「裸鍵」與「shift+同鍵」並存,shift
+            # 按下時會把先前已 down 的裸鍵在遊戲端解讀成 shift+鍵 → 變升降音。
+            key_to_groups: dict[str, set] = {}
+            for mods, items in groups.items():
+                for stk in items:
+                    key_to_groups.setdefault(stk.key, set()).add(mods)
+            conflicts = [k for k, gs in key_to_groups.items() if len(gs) > 1]
+            perf.log(
+                "worker",
+                "chord_modgroups",
+                groups=len(groups),
+                conflicts=",".join(conflicts) if conflicts else "none",
+            )
         order = sorted(groups.keys(), key=lambda mods: (len(mods), mods))
+        mod_delay = 0.0 if self._silent_mode else self._sheet.modifier_delay
         for mod_set in order:
             settle_until = 0.0
-            for stroke in groups[mod_set]:
-                last = self._last_release_at.get(stroke.key)
-                if last is not None:
-                    settle_until = max(settle_until, last + self.SETTLE_AFTER_RELEASE)
+            if not self._silent_mode:
+                for stroke in groups[mod_set]:
+                    last = self._last_release_at.get(stroke.key)
+                    if last is not None:
+                        settle_until = max(settle_until, last + self.SETTLE_AFTER_RELEASE)
             if settle_until > 0:
                 wait = settle_until - time.perf_counter()
                 if wait > 0:
                     time.sleep(wait)
             for modifier in mod_set:
                 backend.key_down(modifier)
-                if self._sheet.modifier_delay:
-                    time.sleep(self._sheet.modifier_delay)
+                if mod_delay:
+                    time.sleep(mod_delay)
             for stroke in groups[mod_set]:
                 self._press_active(backend, stroke.key)
                 self._active_label_counts[stroke.label] = (
                     self._active_label_counts.get(stroke.label, 0) + 1
                 )
             for modifier in reversed(mod_set):
-                if self._sheet.modifier_delay:
-                    time.sleep(self._sheet.modifier_delay)
+                if mod_delay:
+                    time.sleep(mod_delay)
                 backend.key_up(modifier)
 
     def _stroke_up(self, backend: KeyBackend, stroke: KeyStroke) -> None:
