@@ -220,7 +220,7 @@ def _seed_default_songs() -> None:
 
 SETTINGS_DIR = Path.home() / ".nte_piano"
 SETTINGS_PATH = SETTINGS_DIR / "settings.json"
-SETTINGS_VERSION = 21
+SETTINGS_VERSION = 22
 PLAYBACK_SPEEDS = (0.5, 0.75, 1.0, 1.25, 1.5)
 ZOOM_MIN = 0.4
 ZOOM_MAX = 3.0
@@ -533,6 +533,16 @@ class SettingsManager:
         "piano_sound_enabled": True,
         "piano_sound_volume": 0.7,
         "preview_mode": False,
+        # v22:全域熱鍵可設定 + 後台送鍵(PostMessage)。
+        # hotkey_*:KeybindCaptureWidget 改設,空字串表示停用該熱鍵。
+        # force_background_mode:即使視窗在前景也走 PostMessage backend(預設關;
+        # 自動切換邏輯在 PlaybackWorker._resolve_backend,視窗失焦時自動切後台)。
+        "hotkey_play": "f6",
+        "hotkey_stop": "f7",
+        "hotkey_pause": "f8",
+        "hotkey_dodge": "f10",
+        "hotkey_rhythm": "f11",
+        "force_background_mode": False,
     }
 
     # 「執行中功能」開關 — 每次啟動強制歸 False,不論 settings.json 上次存什麼。
@@ -684,6 +694,10 @@ class SettingsManager:
         if version < 21:
             # v20→v21: 新增 piano_sound_enabled / piano_sound_volume / preview_mode。
             # 沿用 _DEFAULTS;preview_mode 由 _RESET_ON_LOAD 每次啟動歸 False。
+            pass
+        if version < 22:
+            # v21→v22: 新增 5 個全域熱鍵自訂(hotkey_play/stop/pause/dodge/rhythm)
+            # 與 force_background_mode 強制後台送鍵開關。全部沿用 _DEFAULTS。
             pass
         data["version"] = SETTINGS_VERSION
         return data
@@ -3585,6 +3599,9 @@ class PianoPlayerWindow(QMainWindow):
         # 預先聆聽模式(preview_mode)時 worker 走 silent_mode,不送鍵但仍 emit
         # note_pressed,因此這個 player 是「聽得到自己排的譜」唯一通道。
         self._preview_mode = bool(self._settings.get("preview_mode", False))
+        # v22:強制後台送鍵(PostMessage)。預設關 — 視窗在前景走 SendInput,
+        # 失焦自動切後台。開啟此選項一律走 PostMessage(視窗在不在前景都行)。
+        self._force_background_mode = bool(self._settings.get("force_background_mode", False))
         self._sound_player = PianoSoundPlayer(_resource_path("assets/sounds/piano"))
         self._sound_player.set_enabled(bool(self._settings.get("piano_sound_enabled", True)))
         self._sound_player.set_volume(float(self._settings.get("piano_sound_volume", 0.7)))
@@ -3675,7 +3692,10 @@ class PianoPlayerWindow(QMainWindow):
         self._bridge.dodge_requested.connect(self.toggle_dodge_worker, Qt.QueuedConnection)
         self._bridge.rhythm_requested.connect(self.toggle_rhythm_worker, Qt.QueuedConnection)
 
-        ok, message = self._hotkeys.start(automation_enabled=True)
+        ok, message = self._hotkeys.start(
+            hotkey_map=self._current_hotkey_map(),
+            automation_enabled=True,
+        )
         admin_note = "管理員" if self._is_admin else "非管理員"
         suffix = "" if self._is_admin else "．若遊戲不接受輸入請改用 run.bat"
         self.statusBar().showMessage(f"{message}（{admin_note}{suffix}）", 6000)
@@ -5483,6 +5503,11 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
                 # cursor 已經過了 loop end → 從 loop_start(或 0)重新開始
                 initial_offset = ls if ls is not None else 0.0
             loop_end_for_worker = le
+        def _game_hwnd_provider() -> int:
+            # 走 nte_playback.find_game_window 的 5 秒 cache,呼叫成本接近零。
+            info = find_game_window()
+            return info.hwnd if info is not None else 0
+
         self._worker = PlaybackWorker(
             sheet,
             START_DELAY_SECONDS,
@@ -5493,6 +5518,8 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
             auto_trim_leading=self._auto_trim_leading_silence,
             loop_end_seconds=loop_end_for_worker,
             silent_mode=self._preview_mode,
+            force_background=self._force_background_mode,
+            hwnd_provider=_game_hwnd_provider,
         )
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
@@ -5596,6 +5623,26 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
     @Slot(int, str, object)
     def _on_playback_progress(self, _index: int, token: str, _labels) -> None:
         self.statusBar().showMessage(f"播放：{token}", 800)
+
+    def _current_hotkey_map(self) -> dict[str, str]:
+        """從 settings 組出 GlobalHotkeys.start 用的 hotkey_map。
+
+        值是 KeybindCaptureWidget 拿到的鍵名字串(lowercased),空字串視為停用。
+        """
+        return {
+            "play": str(self._settings.get("hotkey_play", "f6") or ""),
+            "stop": str(self._settings.get("hotkey_stop", "f7") or ""),
+            "pause": str(self._settings.get("hotkey_pause", "f8") or ""),
+            "dodge": str(self._settings.get("hotkey_dodge", "f10") or ""),
+            "rhythm": str(self._settings.get("hotkey_rhythm", "f11") or ""),
+        }
+
+    def _reapply_global_hotkeys(self) -> None:
+        """settings 中任一 hotkey_* 變動時,把 GlobalHotkeys 重新註冊一次。"""
+        if not hasattr(self, "_hotkeys") or self._hotkeys is None:
+            return
+        ok, message = self._hotkeys.restart(hotkey_map=self._current_hotkey_map())
+        self.statusBar().showMessage(message, 3000)
 
     @Slot(float)
     def _on_seek_requested(self, position_seconds: float) -> None:
@@ -5748,6 +5795,17 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: tran
         if key in ("confirm_discard_unsaved", "confirm_delete_song"):
             # 純設定;_confirm_discard_changes / delete_current_song 下一次呼叫時
             # 自己讀 settings,不需要立即推 side-effect。
+            return
+        if key in (
+            "hotkey_play", "hotkey_stop", "hotkey_pause",
+            "hotkey_dodge", "hotkey_rhythm",
+        ):
+            self._reapply_global_hotkeys()
+            return
+        if key == "force_background_mode":
+            self._force_background_mode = bool(value)
+            if self._worker is not None:
+                self._worker.set_force_background(bool(value))
             return
         if key == "automation_hotkeys_enabled":
             # 已移除 toggle,留分支吞掉舊 setting 的可能 emit,維持 forward-compat。

@@ -49,6 +49,7 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Signal
 
+from nte_perf import perf
 from nte_playback import (
     KeyBackend,
     create_backend_with_fallback,
@@ -57,7 +58,12 @@ from nte_playback import (
     foreground_hwnd,
     is_target_foreground,
     is_window_alive,
+    post_key_to_window,
 )
+
+# 保留歷史名稱供 HeistController 內部呼叫(_post_key_to_window),
+# 實作已搬到 nte_playback.post_key_to_window。
+_post_key_to_window = post_key_to_window
 
 
 # soundcard 在 Windows mediafoundation 偶爾噴 "data discontinuity in recording"
@@ -346,6 +352,7 @@ class WindowedScreenCapture:
         if sct is None or _np is None:
             return None
         region = {"left": int(x), "top": int(y), "width": int(w), "height": int(h)}
+        t0 = time.perf_counter() if perf.enabled else 0.0
         try:
             with self._sct_lock:
                 shot = sct.grab(region)
@@ -353,7 +360,14 @@ class WindowedScreenCapture:
             return None
         # mss 回 BGRA, 轉成 BGR(H, W, 3)
         arr = _np.frombuffer(shot.rgb, dtype=_np.uint8).reshape((shot.height, shot.width, 3))
-        return arr[:, :, ::-1].copy()  # rgb→bgr
+        result = arr[:, :, ::-1].copy()  # rgb→bgr
+        if perf.enabled:
+            perf.log(
+                "capture", "grab",
+                w=w, h=h,
+                ms=f"{(time.perf_counter() - t0) * 1000.0:.2f}",
+            )
+        return result
 
     def close(self) -> None:
         with self._sct_lock:
@@ -677,6 +691,17 @@ class SoundListener:
         self.on_counter_triggered: Optional[Callable[[], None]] = None
         self.on_score_update: Optional[Callable[[float, float], None]] = None
 
+        # ring_buffer 預分配 — 大小固定為 sample_len × sample_rate × 2(雙緩衝
+        # padding)。start→stop→start 沿用同一個 buffer,避免每次重新 np.zeros
+        # 12.8K float64(100KB)造成 GC 壓力。numpy 未安裝時 _ring_buffer = None,
+        # _listen_loop 入口的 _SOUND_LIBS_OK 檢查會擋住執行,不會走到 buffer。
+        max_samples = int(self.used_sr * self.sample_len)
+        self._ring_buffer_size = max_samples * 2
+        if _np is not None:
+            self._ring_buffer = _np.zeros(self._ring_buffer_size, dtype=_np.float64)
+        else:
+            self._ring_buffer = None
+
     def is_loaded(self) -> bool:
         return self._loaded
 
@@ -741,6 +766,7 @@ class SoundListener:
             or _np is None
         ):
             return 0.0
+        t0 = time.perf_counter() if perf.enabled else 0.0
         stream_waveform = self._filtering(stream_waveform)
         norm_stream = _sk_scale(stream_waveform, with_mean=False)
         norm_sample = _sk_scale(sample_waveform, with_mean=False)
@@ -754,7 +780,14 @@ class SoundListener:
                 _scipy_correlate(norm_sample, norm_stream, mode="same", method="fft")
                 / norm_sample.shape[0]
             )
-        return float(_np.max(correlation) * self.expansion_ratio)
+        score = float(_np.max(correlation) * self.expansion_ratio)
+        if perf.enabled:
+            perf.log(
+                "sound", "fft_match",
+                ms=f"{(time.perf_counter() - t0) * 1000.0:.2f}",
+                score=f"{score:.4f}",
+            )
+        return score
 
     def start(self) -> bool:
         if self._running:
@@ -798,7 +831,9 @@ class SoundListener:
                     chunks_per_interval = 1
                 new_samples_per_interval = chunks_per_interval * self.chunk_size
 
-                ring_buffer = _np.zeros(max_samples * 2, dtype=_np.float64)
+                ring_buffer = self._ring_buffer
+                # 預分配的 buffer 沿用,內容歸零讓本次監聽從乾淨狀態起跑。
+                ring_buffer[:] = 0.0
                 buffer_pos = 0
                 total_written = 0
 
@@ -1743,10 +1778,6 @@ class BackgroundAudioMuter:
 MOUSEEVENTF_WHEEL = 0x0800
 WHEEL_DELTA = 120
 
-# Win32 keyboard message constants — 用於 PostMessage 直送 hwnd。
-WM_KEYDOWN = 0x0100
-WM_KEYUP = 0x0101
-
 
 # 觸發鍵名稱 → Windows VK code,對齊 HeistTask.KEY_MAP。
 _HEIST_VK_MAP = {
@@ -1813,55 +1844,6 @@ def _scroll_wheel(delta: int) -> None:
     _ensure_winapi_for_automation()
     user32 = ctypes.windll.user32
     user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, int(delta), None)
-
-
-def _post_key_to_window(hwnd: int, vk: int, down_time: float = 0.02) -> bool:
-    """PostMessage WM_KEYDOWN+WM_KEYUP 直送 hwnd,**不影響系統 keyboard state**。
-
-    這跟 SendInput 的本質差異:SendInput 把事件注入系統輸入佇列,所有應用程式
-    (含 GetAsyncKeyState 的 polling)都看得到狀態變化;PostMessage 把 message
-    直接 post 到指定 hwnd 的訊息佇列,系統 keyboard state 完全不動。
-
-    為什麼粉爪要用這個:使用者實體按住 F 時,SendInput key_up 會把系統 F 翻成
-    up,GetAsyncKeyState 立刻回 false,程式以為使用者鬆開 → 停止連點 → 拾取
-    壞掉。改 PostMessage 後遊戲端照樣收到 WM_KEYDOWN/WM_KEYUP(衍生新的拾取
-    事件),系統 F 狀態不變,GetAsyncKeyState 仍然回 true(因為使用者實體還
-    按著)→ 連點循環持續。
-
-    ── lparam 細節 ──
-    bit 0-15  = repeat count (1)
-    bit 16-23 = scan code (透過 MapVirtualKey vk→sc 算出來)
-    bit 24    = extended key flag (對非 extended 鍵 = 0)
-    bit 29    = context code (alt down) — 一般為 0
-    bit 30    = previous key state (down=1 / up=0)
-    bit 31    = transition state (release=1 / press=0)
-
-    為什麼一定要 scan code:很多遊戲(尤其是 Unity / Unreal 用 Input Manager
-    處理輸入的)會把 wParam(VK)跟 lParam scan code 對照,scan code = 0 直接
-    當無效訊息扔掉。字母數字鍵鬆一點可能放過,但 modifier keys
-    (shift/ctrl/alt)幾乎都驗證 scan code,缺了 shift 衝刺就完全無效。
-
-    回 True 表示 PostMessage 兩次都成功(不保證遊戲有反應)。失敗回 False,
-    呼叫端應該 fallback 到 SendInput backend。
-    """
-    if not hwnd or vk is None or sys.platform != "win32":
-        return False
-    user32 = ctypes.windll.user32
-    try:
-        # MAPVK_VK_TO_VSC = 0;mouse buttons 等沒對應 scan code 會回 0,
-        # 對它們本來也不該走 WM_KEYDOWN(應該用 WM_LBUTTONDOWN 等),這裡
-        # 不處理 mouse 按鈕(目前所有觸發鍵都是鍵盤鍵)。
-        scan = int(user32.MapVirtualKeyW(int(vk), 0)) & 0xFF
-        lparam_down = (scan << 16) | 1
-        # bit 30 (prev down=1) + bit 31 (release=1) + scan + repeat
-        lparam_up = (1 << 31) | (1 << 30) | (scan << 16) | 1
-        ok1 = user32.PostMessageW(int(hwnd), WM_KEYDOWN, int(vk), lparam_down)
-        if down_time > 0:
-            time.sleep(down_time)
-        ok2 = user32.PostMessageW(int(hwnd), WM_KEYUP, int(vk), lparam_up)
-        return bool(ok1 and ok2)
-    except Exception:  # noqa: BLE001
-        return False
 
 
 class HeistController:

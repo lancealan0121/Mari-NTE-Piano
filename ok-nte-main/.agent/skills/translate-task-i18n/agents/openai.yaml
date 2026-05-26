@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task i18n Translator"
+  short_description: "Sync task strings into gettext catalogs"
+  default_prompt: "Use $translate-task-i18n to add or sync task translations and compile i18n catalogs."

@@ -8,7 +8,7 @@ print(nte_version.APP_VERSION)"` 讀進來注入 installer.iss,piano_player.py
 套件尚未驗證可用。
 """
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 GITHUB_OWNER = "lancealan0121"
 GITHUB_REPO = "Mari-NTE-Piano"

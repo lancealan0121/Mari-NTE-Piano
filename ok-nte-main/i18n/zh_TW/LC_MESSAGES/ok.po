@@ -1,0 +1,601 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: you@example.com\n"
+"Last-Translator: you@example.com\n"
+"Language-Team: English\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "<b style=\"color: #0078d7;\">角色</b> 和 <b style=\"color: #0078d7;\">{combo}</b> 支持输入并创建，也支持选择已有项。"
+msgstr "<b style=\"color: #0078d7;\">角色</b> 和 <b style=\"color: #0078d7;\">{combo}</b> 支援輸入並建立，也支援選擇已有項。"
+
+msgid "Arc Key"
+msgstr "弓箭按鍵"
+
+msgid "Check Monthly Card"
+msgstr "檢查月卡"
+
+msgid "Check for monthly card to avoid interruption of tasks"
+msgstr "檢查月卡以避免任務中斷"
+
+msgid "F10"
+msgstr "F10"
+
+msgid "F11"
+msgstr "F11"
+
+msgid "F12"
+msgstr "F12"
+
+msgid "F9"
+msgstr "F9"
+
+msgid "Game Hotkey Config"
+msgstr "遊戲熱鍵設定"
+
+msgid "In Game Hotkey for Skills"
+msgstr "遊戲內技能熱鍵"
+
+msgid "Monthly Card Config"
+msgstr "月卡設定"
+
+msgid "Monthly Card Time"
+msgstr "月卡時間"
+
+msgid "Skill Key"
+msgstr "技能按鍵"
+
+msgid "Turn on to avoid interruption by monthly card when executing tasks"
+msgstr "執行任務時開啟以避免月卡中斷"
+
+msgid "Ultimate Key"
+msgstr "極軌技快速鍵"
+
+msgid "Your computer's local time when the monthly card will popup, hour in (1-24)"
+msgstr "月卡彈出時的電腦本地時間，小時 (1-24)"
+
+msgid "[内置代码]"
+msgstr "[內建代碼]"
+
+msgid "{combo}: {} 删除成功"
+msgstr "{combo}: {} 刪除成功"
+
+msgid "{combo}: {} 绑定成功"
+msgstr "{combo}: {} 綁定成功"
+
+msgid "{combo}语法错误"
+msgstr "{combo}語法錯誤"
+
+msgid "{fixed_team}已保存"
+msgstr "{fixed_team}已儲存"
+
+msgid "{fixed_team}已停用"
+msgstr "{fixed_team}已停用"
+
+msgid "{fixed_team}已清空"
+msgstr "{fixed_team}已清空"
+
+msgid "{} 号位"
+msgstr "{} 號位"
+
+msgid "不扫描也可自动战斗，将使用通用脚本"
+msgstr "不掃描也可自動戰鬥，將使用通用腳本"
+
+msgid "任务跳过对话"
+msgstr "任務跳過對話"
+
+msgid ""
+"供非中/英语用户自定义传送文字, 逗号分隔\n"
+"例: Teleport, 传送"
+msgstr ""
+"供非中/英語用戶自定義傳送文字, 逗號分隔\n"
+"例: Teleport, 傳送"
+
+msgid "保存成功"
+msgstr "儲存成功"
+
+msgid "停用"
+msgstr "停用"
+
+msgid "先扫描或手动填写"
+msgstr "先掃描或手動填寫"
+
+msgid "出招表"
+msgstr "出招表"
+
+msgid "初次使用请先至 [{team_mgmt}] 进行设置"
+msgstr "初次使用請先至 [{team_mgmt}] 進行設置"
+
+msgid "删除"
+msgstr "刪除"
+
+msgid "删除成功"
+msgstr "刪除成功"
+
+msgid "删除角色"
+msgstr "刪除角色"
+
+msgid "刷新列表"
+msgstr "重新整理列表"
+
+msgid "匹配成功: {}"
+msgstr "比對成功: {}"
+
+msgid "匹配文字"
+msgstr "比對文字"
+
+msgid "受《异环》UI的特殊性影响, 部分场景下存在识别稳定性波动"
+msgstr "受《異環》UI的特殊性影響, 部分場景下存在識別穩定性波動"
+
+msgid "可用指令"
+msgstr "可用指令"
+
+msgid "启用"
+msgstr "啟用"
+
+msgid "固定队伍"
+msgstr "固定隊伍"
+
+msgid "地图中自动点击传送"
+msgstr "地圖中自動點擊傳送"
+
+msgid "填入扫描"
+msgstr "填入掃描"
+
+msgid "增加 <b style=\"color: #0078d7;\">角色特征</b> 后将自动判断当前角色。<br>如果不想管理 <b style=\"color: #0078d7;\">角色特征</b>，可以直接启用 <b style=\"color: #0078d7;\">{fixed_team}</b> 功能。"
+msgstr "增加 <b style=\"color: #0078d7;\">角色特徵</b> 後將自動判斷當前角色。<br>如果不想管理 <b style=\"color: #0078d7;\">角色特徵</b>，可以直接啟用 <b style=\"color: #0078d7;\">{fixed_team}</b> 功能。"
+
+msgid "完成每日活跃度"
+msgstr "完成每日活躍度"
+
+msgid "导入失败"
+msgstr "導入失敗"
+
+msgid "导入成功"
+msgstr "導入成功"
+
+msgid "导入数据"
+msgstr "導入數據"
+
+msgid "导出数据"
+msgstr "匯出數據"
+
+msgid "将优先使用固定角色进行战斗，未启用或槽位为空时自动识别"
+msgstr "將優先使用固定角色進行戰鬥，未啟用或槽位為空時自動識別"
+
+msgid "已保存 {}/4"
+msgstr "已儲存 {}/4"
+
+msgid "已启用 {}/4"
+msgstr "已啟用 {}/4"
+
+msgid "已启用{fixed_team}"
+msgstr "已啟用{fixed_team}"
+
+msgid "已填入 {}"
+msgstr "已填入 {}"
+
+msgid "已填入扫描结果"
+msgstr "已填入掃描結果"
+
+msgid "已导入 {} 个文件"
+msgstr "已導入 {} 個檔案"
+
+msgid "已恢复自动识别"
+msgstr "已恢復自動識別"
+
+msgid "已成功删除角色: {} 以及关联的特征图"
+msgstr "已成功刪除角色: {} 以及關聯的特徵圖"
+
+msgid "已清空槽位"
+msgstr "已清空槽位"
+
+msgid "已解除 {} 的{combo}绑定"
+msgstr "已解除 {} 的{combo}綁定"
+
+msgid "应用更改"
+msgstr "套用更改"
+
+msgid ""
+"当前未绑定任何{combo}。\n"
+"遇到此角色将默认使用基础通用脚本(BaseChar)。"
+msgstr ""
+"目前未綁定任何{combo}。\n"
+"遇到此角色將默認使用基礎通用腳本(BaseChar)。"
+
+msgid "循环次数"
+msgstr "循環次數"
+
+msgid "快速传送"
+msgstr "快速傳送"
+
+msgid "扫描中..."
+msgstr "掃描中..."
+
+msgid "扫描队伍"
+msgstr "掃描隊伍"
+
+msgid "控条模式"
+msgstr "控條模式"
+
+msgid "搜索角色"
+msgstr "搜尋角色"
+
+msgid "无画面"
+msgstr "無畫面"
+
+msgid "日常任务"
+msgstr "日常任務"
+
+msgid "暂不可用"
+msgstr "暫不可用"
+
+msgid "更新"
+msgstr "更新"
+
+msgid "未启用"
+msgstr "未啟用"
+
+msgid "未能识别该特征"
+msgstr "未能識別該特徵"
+
+msgid "未获取到特征"
+msgstr "未獲取到特徵"
+
+msgid "未识别，关联新特征"
+msgstr "未識別，關聯新特徵"
+
+msgid ""
+"此为内建 Python 脚本，不可在此修改。\n"
+"请在对应的源文件中直接修改代码。"
+msgstr ""
+"此為內建 Python 腳本，不可在此修改。\n"
+"請在對應的源文件中直接修改代碼。"
+
+msgid "没有可用扫描结果"
+msgstr "沒有可用掃描結果"
+
+msgid "没有找到匹配的指令。"
+msgstr "沒有找到匹配的指令。"
+
+msgid "清空"
+msgstr "清空"
+
+msgid "点击上方按钮扫描..."
+msgstr "點擊上方按鈕掃描..."
+
+msgid "点击时将短暂控制物理鼠标"
+msgstr "點擊時將短暫控制物理滑鼠"
+
+msgid "点按"
+msgstr "點按"
+
+msgid "点按时长倍率"
+msgstr "點按時長倍率"
+
+msgid "点按模式专用。用于微调每次按键的持续时间"
+msgstr "點按模式專用。用於微調每次按鍵的持續時間"
+
+msgid "编辑名称"
+msgstr "編輯名稱"
+
+msgid "自动完成一轮或多轮钓鱼"
+msgstr "自動完成一輪或多輪釣魚"
+
+msgid "自动战斗"
+msgstr "自動戰鬥"
+
+msgid "自动消息"
+msgstr "自動消息"
+
+msgid "自动目标"
+msgstr "自動目標"
+
+msgid "自动钓鱼"
+msgstr "自動釣魚"
+
+msgid "角色"
+msgstr "角色"
+
+msgid "角色中心"
+msgstr "角色中心"
+
+msgid "角色名称无效或已存在"
+msgstr "角色名稱無效或已存在"
+
+msgid "角色已重命名为: {}"
+msgstr "角色已重新命名為: {}"
+
+msgid "角色管理"
+msgstr "角色管理"
+
+msgid "解除绑定"
+msgstr "解除綁定"
+
+msgid "请在左侧选择一个角色以管理特征和{combo}"
+msgstr "請在左側選擇一個角色以管理特徵和{combo}"
+
+msgid "跳过剧情"
+msgstr "跳過劇情"
+
+msgid "运行一次测试"
+msgstr "運行一次測試"
+
+msgid "选择或输入{combo}名"
+msgstr "選擇或輸入{combo}名"
+
+msgid "重命名失败"
+msgstr "重新命名失敗"
+
+msgid "长按"
+msgstr "長按"
+
+msgid ""
+"长按：平滑流畅, 易过冲\n"
+"点按: 安全较慢, 防过冲"
+msgstr ""
+"長按：平滑流暢, 易過衝\n"
+"點按: 安全較慢, 防過衝"
+
+msgid "队伍不存在"
+msgstr "隊伍不存在"
+
+msgid "队伍人数少于2人"
+msgstr "隊伍人數少於2人"
+
+msgid "队伍管理"
+msgstr "隊伍管理"
+
+msgid "领取活跃度奖励"
+msgstr "領取活躍度獎勵"
+
+msgid "领取环期任务奖励"
+msgstr "領取環期任務獎勵"
+
+msgid "领取邮件"
+msgstr "領取郵件"
+
+msgid "使用ESC"
+msgstr "使用 ESC"
+
+msgid "关闭时仅在中键选中敌人且画面识别到 'Lv' 文字时开启战斗"
+msgstr "關閉時僅在中鍵選中敵人且畫面識別到 'Lv' 文字時開啟戰鬥"
+
+msgid ""
+"开启后优先通过 ESC 键关闭成功界面，避免后台抢占鼠标。\n"
+"若游戏运行不流畅，可能因按键响应延迟导致误退出钓鱼场景"
+msgstr ""
+"開啟後優先通過 ESC 鍵關閉成功界面，避免後台搶佔滑鼠。\n"
+"若遊戲運行不流暢，可能因按鍵響應延遲導致誤退出釣魚場景"
+
+msgid "Counter Attack Threshold"
+msgstr "反擊觸發閾值"
+
+msgid "Counter attack sound recognition threshold (0.0-1.0, lower is more sensitive)"
+msgstr "反擊聲音識別閾值（0.0-1.0，越低越靈敏）"
+
+msgid "Dodge Threshold"
+msgstr "閃避觸發閾值"
+
+msgid "Dodge sound recognition threshold (0.0-1.0, lower is more sensitive)"
+msgstr "閃避聲音識別閾值（0.0-1.0，越低越靈敏）"
+
+msgid "Enable Sound Trigger"
+msgstr "啟用聲音觸發"
+
+msgid "Enable sound recognition for automatic dodge and counter attacks"
+msgstr "啟用聲音識別以實現自動閃避和反擊"
+
+msgid "Sound Trigger Config"
+msgstr "聲音觸發配置"
+
+msgid "Sound-based dodge and counter trigger settings"
+msgstr "基於聲音的閃避和反擊觸發設置"
+
+msgid "Dodge All Attacks"
+msgstr "閃避所有攻擊"
+
+msgid "Dodge all attacks without performing counter attacks"
+msgstr "閃避所有攻擊，不執行反擊"
+
+msgid "不支持从OK启动游戏"
+msgstr "不支援從 OK 啟動遊戲"
+
+msgid "任务完成后自动切换至下一个项目"
+msgstr "任務完成後自動切換至下一個項目"
+
+msgid "任务类型"
+msgstr "任務類型"
+
+msgid "具体奖励目标"
+msgstr "具體獎勵目標"
+
+msgid "异能升级材料"
+msgstr "異能升級材料"
+
+msgid "异能材料序号"
+msgstr "異能材料序號"
+
+msgid "异象界域"
+msgstr "異象界域"
+
+msgid "弧盘材料序号"
+msgstr "弧盤材料序號"
+
+msgid "弧盘突破材料"
+msgstr "弧盤突破材料"
+
+msgid "弧盘经验"
+msgstr "弧盤經驗"
+
+msgid "甲硬币"
+msgstr "甲硬幣"
+
+msgid "空幕"
+msgstr "空幕"
+
+msgid "空幕序号"
+msgstr "空幕序號"
+
+msgid "经验与甲硬币"
+msgstr "經驗與甲硬幣"
+
+msgid "自动循环项目"
+msgstr "自動循環項目"
+
+msgid "自动进行异象界域任务"
+msgstr "自動進行異象界域任務"
+
+msgid "角色经验"
+msgstr "角色經驗"
+
+msgid "选择经验与甲硬币任务的具体奖励目标"
+msgstr "選擇經驗與甲硬幣任務的具體獎勵目標"
+
+msgid "选择要进行的任务类型"
+msgstr "選擇要進行的任務類型"
+
+msgid "选择列表中的第几个项目 ({}-{})"
+msgstr "選擇列表中的第幾個項目 ({}-{})"
+
+msgid "使用滚轮加速拾取"
+msgstr "使用滾輪加速拾取"
+
+msgid "切换角色快速奔跑"
+msgstr "切換角色快速奔跑"
+
+msgid "切换角色数量"
+msgstr "切換角色數量"
+
+msgid "快速奔跑角色数量"
+msgstr "快速奔跑角色數量"
+
+msgid "按住Shift生效"
+msgstr "按住 Shift 生效"
+
+msgid "粉爪大劫案"
+msgstr "粉爪大劫案"
+
+msgid "粉爪大劫案便利性功能"
+msgstr "粉爪大劫案便利性功能"
+
+msgid "触发按键"
+msgstr "觸發按鍵"
+
+msgid "触发连点将同步生效"
+msgstr "觸發連點將同步生效"
+
+msgid "触发连点的按键 (按住生效)"
+msgstr "觸發連點的按鍵，按住該鍵生效"
+
+msgid "自动补饵卖鱼"
+msgstr "自動補餌賣魚"
+
+msgid "抛竿失败时，补充默认鱼饵并出售鱼获后重试"
+msgstr "拋竿失敗時，補充預設魚餌並出售魚獲後重試"
+
+msgid "4列对应的键盘按键"
+msgstr "4列對應的鍵盤按鍵"
+
+msgid "单曲超时时间(秒)"
+msgstr "單曲超時時間(秒)"
+
+msgid "异环鼓组音游自动打击与重试"
+msgstr "異環鼓組音遊自動打擊與重試"
+
+msgid "打歌次数, 0=无限循环"
+msgstr "打歌次數, 0=無限循環"
+
+msgid "自动音游"
+msgstr "自動音遊"
+
+msgid "调试日志"
+msgstr "調試日誌"
+
+msgid "超时秒数"
+msgstr "超時秒數"
+
+msgid "输出调试日志"
+msgstr "輸出調試日誌"
+
+msgid "键位"
+msgstr "鍵位"
+
+msgid "Start Game"
+msgstr "啟動遊戲"
+
+msgid "Launcher Path"
+msgstr "啟動器路徑"
+
+msgid "目标消耗体力"
+msgstr "目標消耗體力"
+
+msgid "声音闪避反击"
+msgstr "聲音閃避反擊"
+
+msgid "未处于自动战斗时, 响应声音闪避或反击"
+msgstr "未處於自動戰鬥時, 響應聲音閃避或反擊"
+
+msgid ""
+"All letter/number keys, including every hotkey above, are replaced by US QWERTY\n"
+"physical positions, not your current layout's printed keys."
+msgstr ""
+"所有字母/數字按鍵，包括上方所有快捷鍵，都會按照美式 QWERTY\n"
+"物理位置替換，而不是目前鍵盤佈局上印刷的按鍵。"
+
+msgid "Use QWERTY Physical Keys"
+msgstr "使用 QWERTY 物理按鍵"
+
+msgid "店长特供"
+msgstr "店長特供"
+
+msgid "抢钱流"
+msgstr "搶錢流"
+
+msgid "游戏启动后自动登录游戏"
+msgstr "遊戲啟動後自動登入遊戲"
+
+msgid "自动循环进出关卡（需配合游戏内挂机流派使用）"
+msgstr "自動循環進出關卡（需配合遊戲內掛機流派使用）"
+
+msgid "自动登录游戏"
+msgstr "自動登入遊戲"
+
+msgid "领取/补货一咖舍"
+msgstr "領取/補貨一咖舍"
+
+msgid ""
+"功能说明：本功能仅负责『自动退出关卡』与『重新开启关卡』的点击循环，不包含任何局内的制作食物或招待客人操作。\n"
+"\n"
+"使用方法：\n"
+"1. 确保您已配置好游戏内的挂机流派。\n"
+"2. 站在咖啡店可进行 F 交互的位置。\n"
+"3. （可选）若想指定特定关卡，请先手动进入该关卡一次后退出，再启动本脚本即可。"
+msgstr ""
+"功能說明：本功能僅負責「自動退出關卡」與「重新開啟關卡」的點擊循環，不包含任何局內的製作食物或招待客人操作。\n"
+"\n"
+"使用方法：\n"
+"1. 確保您已配置好遊戲內的掛機流派。\n"
+"2. 站在咖啡店可進行 F 互動的位置。\n"
+"3. （可選）若想指定特定關卡，請先手動進入該關卡一次後退出，再啟動本腳本即可。"
+
+msgid "一咖舍任务"
+msgstr "一咖舍任務"
+
+msgid "选择日常任务中的一咖舍处理方式"
+msgstr "選擇日常任務中的一咖舍處理方式"
+
+msgid "不执行"
+msgstr "不執行"
+
+msgid "记录新特征"
+msgstr "記錄新特徵"
+
+msgid "输入或选择关联的角色名称"
+msgstr "輸入或選擇關聯的角色名稱"
+
+msgid "输入或选择绑定的{combo} (可选)"
+msgstr "輸入或選擇綁定的{combo}（可選）"

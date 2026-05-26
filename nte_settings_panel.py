@@ -654,13 +654,6 @@ class SettingsPanel(QWidget):
     setting_changed = Signal(str, object)
 
     # Combo / 選項清單 — 跟 nte_automation 後端接受的字串對齊。
-    _HEIST_TRIGGER_OPTIONS = [
-        ("f", "F"), ("e", "E"), ("g", "G"), ("r", "R"),
-        ("space", "Space"), ("shift", "Shift"), ("ctrl", "Ctrl"), ("alt", "Alt"),
-    ]
-    _DODGE_KEY_OPTIONS = [
-        ("shift", "Shift"), ("space", "Space"), ("ctrl", "Ctrl"),
-    ]
     _FPS_OPTIONS = [(30, "30"), (60, "60"), (120, "120")]
 
     def __init__(
@@ -721,6 +714,8 @@ class SettingsPanel(QWidget):
         self._build_dodge_group()
         self._build_rhythm_group()
         self._build_heist_group()
+        self._build_global_hotkeys_group()
+        self._build_background_mode_group()
 
     def _add_group(self, title: str) -> QGridLayout:
         group = QGroupBox(title)
@@ -1019,18 +1014,13 @@ class SettingsPanel(QWidget):
         self._register("dodge_counter_threshold", ctr, ctr.value, ctr.set_value)
 
         g.addWidget(QLabel("閃避按鍵"), 3, 0)
-        key = QComboBox()
-        for v, label in self._DODGE_KEY_OPTIONS:
-            key.addItem(label, v)
-        self._set_combo_data(key, str(self._get("dodge_key", "shift")))
-        key.currentIndexChanged.connect(
-            lambda _i: self._emit("dodge_key", str(key.currentData() or "shift"))
-        )
+        key = KeybindCaptureWidget(initial=str(self._get("dodge_key", "shift")))
+        key.key_changed.connect(lambda name: self._emit("dodge_key", str(name) or "shift"))
         g.addWidget(key, 3, 1)
         self._register(
             "dodge_key", key,
-            lambda: str(key.currentData() or "shift"),
-            lambda v: self._set_combo_data(key, str(v)),
+            lambda: key.key_name() or "shift",
+            lambda v: key.set_key_name(str(v)),
         )
 
         mouse = ToggleSwitchRow("反擊用滑鼠左鍵")
@@ -1103,18 +1093,13 @@ class SettingsPanel(QWidget):
         self._register("heist_enabled", enable, enable.isChecked, enable.setChecked)
 
         g.addWidget(QLabel("觸發鍵"), 1, 0)
-        trig = QComboBox()
-        for v, label in self._HEIST_TRIGGER_OPTIONS:
-            trig.addItem(label, v)
-        self._set_combo_data(trig, str(self._get("heist_trigger_key", "f")))
-        trig.currentIndexChanged.connect(
-            lambda _i: self._emit("heist_trigger_key", str(trig.currentData() or "f"))
-        )
+        trig = KeybindCaptureWidget(initial=str(self._get("heist_trigger_key", "f")))
+        trig.key_changed.connect(lambda name: self._emit("heist_trigger_key", str(name) or "f"))
         g.addWidget(trig, 1, 1)
         self._register(
             "heist_trigger_key", trig,
-            lambda: str(trig.currentData() or "f"),
-            lambda v: self._set_combo_data(trig, str(v)),
+            lambda: trig.key_name() or "f",
+            lambda v: trig.set_key_name(str(v)),
         )
 
         auto = ToggleSwitchRow("全自動拾取(不必按住觸發鍵)")
@@ -1133,6 +1118,46 @@ class SettingsPanel(QWidget):
         g.addWidget(hotkey, 3, 1)
         self._register(
             "heist_auto_mode_hotkey", hotkey, hotkey.key_name, hotkey.set_key_name
+        )
+
+    def _build_global_hotkeys_group(self) -> None:
+        g = self._add_group("全域熱鍵")
+
+        # 5 個全域熱鍵的鍵位設定 — pynput GlobalHotKeys 註冊,任何視窗為前景
+        # 時按下都會觸發對應動作。預設值對齊 v22 前的 hardcode 行為。
+        rows = [
+            ("hotkey_play", "播放", "f6"),
+            ("hotkey_stop", "停止", "f7"),
+            ("hotkey_pause", "暫停", "f8"),
+            ("hotkey_dodge", "閃避", "f10"),
+            ("hotkey_rhythm", "音游", "f11"),
+        ]
+        for idx, (key, label, default) in enumerate(rows):
+            g.addWidget(QLabel(label), idx, 0)
+            widget = KeybindCaptureWidget(initial=str(self._get(key, default)))
+            # closure 捕獲 widget / key 用 default arg,避免後續迭代覆蓋。
+            widget.key_changed.connect(
+                lambda name, _key=key: self._emit(_key, str(name))
+            )
+            g.addWidget(widget, idx, 1)
+            self._register(
+                key, widget,
+                widget.key_name,
+                widget.set_key_name,
+            )
+
+    def _build_background_mode_group(self) -> None:
+        g = self._add_group("後台送鍵")
+
+        # 預設關 — 一般情境下「視窗在前景就走 SendInput,視窗失焦自動切
+        # PostMessage」已經夠用。開啟此選項會強制走 PostMessage,適合想要完全
+        # 不切視窗的情境(例如另一螢幕掛機操作)。
+        force = ToggleSwitchRow("強制後台模式(視窗不在前景也送鍵)")
+        force.setChecked(bool(self._get("force_background_mode", False)))
+        force.toggled.connect(lambda c: self._emit("force_background_mode", bool(c)))
+        g.addWidget(force, 0, 0, 1, 2)
+        self._register(
+            "force_background_mode", force, force.isChecked, force.setChecked
         )
 
     # ----- 共用工具 -----

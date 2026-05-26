@@ -1,0 +1,601 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: you@example.com\n"
+"Last-Translator: you@example.com\n"
+"Language-Team: English\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "<b style=\"color: #0078d7;\">角色</b> 和 <b style=\"color: #0078d7;\">{combo}</b> 支持输入并创建，也支持选择已有项。"
+msgstr "「キャラクター」と「{combo}」は入力して作成でき、既存の項目を選択することもできます。"
+
+msgid "Arc Key"
+msgstr "アークキー"
+
+msgid "Check Monthly Card"
+msgstr "月額カード確認"
+
+msgid "Check for monthly card to avoid interruption of tasks"
+msgstr "タスクの中断を避けるために月額カードを確認する"
+
+msgid "F10"
+msgstr "F10"
+
+msgid "F11"
+msgstr "F11"
+
+msgid "F12"
+msgstr "F12"
+
+msgid "F9"
+msgstr "F9"
+
+msgid "Game Hotkey Config"
+msgstr "ゲームホットキー設定"
+
+msgid "In Game Hotkey for Skills"
+msgstr "スキル用ゲーム内ホットキー"
+
+msgid "Monthly Card Config"
+msgstr "月額カード設定"
+
+msgid "Monthly Card Time"
+msgstr "月額カード時間"
+
+msgid "Skill Key"
+msgstr "スキルキー"
+
+msgid "Turn on to avoid interruption by monthly card when executing tasks"
+msgstr "タスク実行時に月額カードによる中断を避けるためにオンにする"
+
+msgid "Ultimate Key"
+msgstr "アルティメットキー"
+
+msgid "Your computer's local time when the monthly card will popup, hour in (1-24)"
+msgstr "月額カードがポップアップするコンピュータのローカル時間（1-24時）"
+
+msgid "[内置代码]"
+msgstr "[内蔵コード]"
+
+msgid "{combo}: {} 删除成功"
+msgstr "{combo}: {} 削除成功"
+
+msgid "{combo}: {} 绑定成功"
+msgstr "{combo}: {} 紐付け成功"
+
+msgid "{combo}语法错误"
+msgstr "{combo}構文エラー"
+
+msgid "{fixed_team}已保存"
+msgstr "{fixed_team}保存済み"
+
+msgid "{fixed_team}已停用"
+msgstr "{fixed_team}無効化済み"
+
+msgid "{fixed_team}已清空"
+msgstr "{fixed_team}クリア済み"
+
+msgid "{} 号位"
+msgstr "{} 番目のスロット"
+
+msgid "不扫描也可自动战斗，将使用通用脚本"
+msgstr "スキャンしなくても自動戦闘が可能で、汎用スクリプトが使用されます"
+
+msgid "任务跳过对话"
+msgstr "会話スキップタスク"
+
+msgid ""
+"供非中/英语用户自定义传送文字, 逗号分隔\n"
+"例: Teleport, 传送"
+msgstr ""
+"非中/英語ユーザーがテレポートテキストをカスタマイズするため、カンマで区切ります\n"
+"例: Teleport, 传送"
+
+msgid "保存成功"
+msgstr "保存成功"
+
+msgid "停用"
+msgstr "無効化"
+
+msgid "先扫描或手动填写"
+msgstr "先にスキャンするか手動で入力してください"
+
+msgid "出招表"
+msgstr "コンボリスト"
+
+msgid "初次使用请先至 [{team_mgmt}] 进行设置"
+msgstr "初めて使用する場合は、まず [{team_mgmt}] で設定を行ってください"
+
+msgid "删除"
+msgstr "削除"
+
+msgid "删除成功"
+msgstr "削除成功"
+
+msgid "删除角色"
+msgstr "キャラクター削除"
+
+msgid "刷新列表"
+msgstr "リスト更新"
+
+msgid "匹配成功: {}"
+msgstr "一致成功: {}"
+
+msgid "匹配文字"
+msgstr "テキスト一致"
+
+msgid "受《异环》UI的特殊性影响, 部分场景下存在识别稳定性波动"
+msgstr "『異環』UIの特殊性の影響により、一部のシーンで認識の安定性に変動が生じることがあります"
+
+msgid "可用指令"
+msgstr "利用可能なコマンド"
+
+msgid "启用"
+msgstr "有効化"
+
+msgid "固定队伍"
+msgstr "固定チーム"
+
+msgid "地图中自动点击传送"
+msgstr "マップ内で自動テレポート"
+
+msgid "填入扫描"
+msgstr "スキャン結果を入力"
+
+msgid "增加 <b style=\"color: #0078d7;\">角色特征</b> 后将自动判断当前角色。<br>如果不想管理 <b style=\"color: #0078d7;\">角色特征</b>，可以直接启用 <b style=\"color: #0078d7;\">{fixed_team}</b> 功能。"
+msgstr "キャラクター特徴を追加すると、現在のキャラクターを自動的に判別します。<br>キャラクター特徴を管理したくない場合は、直接 {fixed_team} 機能を有効にできます。"
+
+msgid "完成每日活跃度"
+msgstr "デイリーアクティビティを完了"
+
+msgid "导入失败"
+msgstr "インポート失敗"
+
+msgid "导入成功"
+msgstr "インポート成功"
+
+msgid "导入数据"
+msgstr "データインポート"
+
+msgid "导出数据"
+msgstr "データエクスポート"
+
+msgid "将优先使用固定角色进行战斗，未启用或槽位为空时自动识别"
+msgstr "戦闘には固定キャラクターが優先的に使用され、無効またはスロットが空の場合は自動的に認識されます"
+
+msgid "已保存 {}/4"
+msgstr "保存済み {}/4"
+
+msgid "已启用 {}/4"
+msgstr "有効化済み {}/4"
+
+msgid "已启用{fixed_team}"
+msgstr "{fixed_team}有効化済み"
+
+msgid "已填入 {}"
+msgstr "{} を入力しました"
+
+msgid "已填入扫描结果"
+msgstr "スキャン結果を入力しました"
+
+msgid "已导入 {} 个文件"
+msgstr "{} 個のファイルをインポートしました"
+
+msgid "已恢复自动识别"
+msgstr "自動認識を復元しました"
+
+msgid "已成功删除角色: {} 以及关联的特征图"
+msgstr "キャラクター: {} と関連する特徴マップを正常に削除しました"
+
+msgid "已清空槽位"
+msgstr "スロットをクリアしました"
+
+msgid "已解除 {} 的{combo}绑定"
+msgstr "{} の{combo}紐付けを解除しました"
+
+msgid "应用更改"
+msgstr "変更を適用"
+
+msgid ""
+"当前未绑定任何{combo}。\n"
+"遇到此角色将默认使用基础通用脚本(BaseChar)。"
+msgstr ""
+"現在、{combo}は紐付けられていません。\n"
+"このキャラクターにはデフォルトで基本汎用スクリプト(BaseChar)が使用されます。"
+
+msgid "循环次数"
+msgstr "ループ回数"
+
+msgid "快速传送"
+msgstr "高速移動"
+
+msgid "扫描中..."
+msgstr "スキャン中..."
+
+msgid "扫描队伍"
+msgstr "チームスキャン"
+
+msgid "控条模式"
+msgstr "ゲージ制御モード"
+
+msgid "搜索角色"
+msgstr "キャラクター検索"
+
+msgid "无画面"
+msgstr "画面なし"
+
+msgid "日常任务"
+msgstr "デイリー任務"
+
+msgid "暂不可用"
+msgstr "一時的に利用不可"
+
+msgid "更新"
+msgstr "更新"
+
+msgid "未启用"
+msgstr "未有効"
+
+msgid "未能识别该特征"
+msgstr "特徴を認識できませんでした"
+
+msgid "未获取到特征"
+msgstr "特徴を取得できませんでした"
+
+msgid "未识别，关联新特征"
+msgstr "未認識、新しい特徴を関連付け"
+
+msgid ""
+"此为内建 Python 脚本，不可在此修改。\n"
+"请在对应的源文件中直接修改代码。"
+msgstr ""
+"これは内蔵の Python スクリプトであり、ここでは変更できません。\n"
+"対応するソースファイルで直接コードを修正してください。"
+
+msgid "没有可用扫描结果"
+msgstr "利用可能なスキャン結果がありません"
+
+msgid "没有找到匹配的指令。"
+msgstr "一致するコマンドが見つかりませんでした。"
+
+msgid "清空"
+msgstr "クリア"
+
+msgid "点击上方按钮扫描..."
+msgstr "上のボタンをクリックしてスキャンしてください..."
+
+msgid "点击时将短暂控制物理鼠标"
+msgstr "クリック時に物理マウスを一瞬制御します"
+
+msgid "点按"
+msgstr "タップ"
+
+msgid "点按时长倍率"
+msgstr "タップ時間倍率"
+
+msgid "点按模式专用。用于微调每次按键的持续时间"
+msgstr "タップモード専用。各キー入力の持続時間を微調整するために使用します"
+
+msgid "编辑名称"
+msgstr "名称編集"
+
+msgid "自动完成一轮或多轮钓鱼"
+msgstr "1ラウンドまたは複数ラウンドの釣りを自動で完了します"
+
+msgid "自动战斗"
+msgstr "自動戦闘"
+
+msgid "自动消息"
+msgstr "自動メッセージ"
+
+msgid "自动目标"
+msgstr "自動ターゲット"
+
+msgid "自动钓鱼"
+msgstr "自動釣り"
+
+msgid "角色"
+msgstr "キャラクター"
+
+msgid "角色中心"
+msgstr "キャラ中心"
+
+msgid "角色名称无效或已存在"
+msgstr "キャラクター名が無効か、既に存在します"
+
+msgid "角色已重命名为: {}"
+msgstr "キャラクター名を {} に変更しました"
+
+msgid "角色管理"
+msgstr "キャラ管理"
+
+msgid "解除绑定"
+msgstr "紐付け解除"
+
+msgid "请在左侧选择一个角色以管理特征和{combo}"
+msgstr "左側でキャラクターを選択して、特徴と{combo}を管理してください"
+
+msgid "跳过剧情"
+msgstr "ストーリースキップ"
+
+msgid "运行一次测试"
+msgstr "テストを1回実行"
+
+msgid "选择或输入{combo}名"
+msgstr "{combo}名を選択または入力"
+
+msgid "重命名失败"
+msgstr "名前変更失敗"
+
+msgid "长按"
+msgstr "長押し"
+
+msgid ""
+"长按：平滑流畅, 易过冲\n"
+"点按: 安全较慢, 防过冲"
+msgstr ""
+"長押し: スムーズで流動的、オーバーシュートしやすい\n"
+"タップ: 安全で低速、オーバーシュートを防止"
+
+msgid "队伍不存在"
+msgstr "チームが存在しません"
+
+msgid "队伍人数少于2人"
+msgstr "チーム人数が2人未満です"
+
+msgid "队伍管理"
+msgstr "チーム管理"
+
+msgid "领取活跃度奖励"
+msgstr "アクティビティ報酬を受け取る"
+
+msgid "领取环期任务奖励"
+msgstr "定期任務報酬を受け取る"
+
+msgid "领取邮件"
+msgstr "メールを受け取る"
+
+msgid "使用ESC"
+msgstr "ESCを使用"
+
+msgid "关闭时仅在中键选中敌人且画面识别到 'Lv' 文字时开启战斗"
+msgstr "オフの場合、中クリックで敵を選択し、画面上で「Lv」の文字が認識された時のみ戦闘を開始します"
+
+msgid ""
+"开启后优先通过 ESC 键关闭成功界面，避免后台抢占鼠标。\n"
+"若游戏运行不流畅，可能因按键响应延迟导致误退出钓鱼场景"
+msgstr ""
+"有効にすると、ESCキーを優先して成功画面を閉じ、バックグラウンドでのマウスの奪い合いを避けます。\n"
+"ゲームの動作がスムーズでない場合、キー応答の遅延により釣りシーンから誤って退出する可能性があります"
+
+msgid "Counter Attack Threshold"
+msgstr "反撃のしきい値"
+
+msgid "Counter attack sound recognition threshold (0.0-1.0, lower is more sensitive)"
+msgstr "反撃音認識のしきい値 (0.0-1.0、低いほど感度が高くなります)"
+
+msgid "Dodge Threshold"
+msgstr "回避のしきい値"
+
+msgid "Dodge sound recognition threshold (0.0-1.0, lower is more sensitive)"
+msgstr "回避音認識のしきい値 (0.0-1.0、低いほど感度が高くなります)"
+
+msgid "Enable Sound Trigger"
+msgstr "サウンドトリガーを有効にする"
+
+msgid "Enable sound recognition for automatic dodge and counter attacks"
+msgstr "自動回避と反撃のための音声認識を有効にする"
+
+msgid "Sound Trigger Config"
+msgstr "サウンドトリガー設定"
+
+msgid "Sound-based dodge and counter trigger settings"
+msgstr "音に基づく回避および反撃トリガーの設定"
+
+msgid "Dodge All Attacks"
+msgstr "すべての攻撃を回避"
+
+msgid "Dodge all attacks without performing counter attacks"
+msgstr "カウンター攻撃を行わず、すべての攻撃を回避します"
+
+msgid "不支持从OK启动游戏"
+msgstr "OKからのゲーム起動はサポートされていません"
+
+msgid "任务完成后自动切换至下一个项目"
+msgstr "タスク完了後に次の項目へ自動で切り替えます"
+
+msgid "任务类型"
+msgstr "タスクタイプ"
+
+msgid "具体奖励目标"
+msgstr "具体的な報酬目標"
+
+msgid "异能升级材料"
+msgstr "異能強化"
+
+msgid "异能材料序号"
+msgstr "異能強化番号"
+
+msgid "异象界域"
+msgstr "アノマリーゾーン"
+
+msgid "弧盘材料序号"
+msgstr "弧盤突破番号"
+
+msgid "弧盘突破材料"
+msgstr "弧盤突破"
+
+msgid "弧盘经验"
+msgstr "弧盤経験値"
+
+msgid "甲硬币"
+msgstr "ビートルコイン"
+
+msgid "空幕"
+msgstr "コンソール"
+
+msgid "空幕序号"
+msgstr "コンソール番号"
+
+msgid "经验与甲硬币"
+msgstr "EXP & ビートルコイン"
+
+msgid "自动循环项目"
+msgstr "項目を自動循環"
+
+msgid "自动进行异象界域任务"
+msgstr "アノマリーゾーンタスクを自動実行"
+
+msgid "角色经验"
+msgstr "キャラクター経験値"
+
+msgid "选择经验与甲硬币任务的具体奖励目标"
+msgstr "EXP & ビートルコインタスクの具体的な報酬目標を選択"
+
+msgid "选择要进行的任务类型"
+msgstr "実行するタスクタイプを選択"
+
+msgid "选择列表中的第几个项目 ({}-{})"
+msgstr "リストの何番目の項目を選択するか ({}-{})"
+
+msgid "使用滚轮加速拾取"
+msgstr "マウスホイールで拾得を加速"
+
+msgid "切换角色快速奔跑"
+msgstr "キャラクターを切り替えて高速ダッシュ"
+
+msgid "切换角色数量"
+msgstr "切り替えキャラクター数"
+
+msgid "快速奔跑角色数量"
+msgstr "高速ダッシュキャラクター数"
+
+msgid "按住Shift生效"
+msgstr "Shiftキー長押しで有効"
+
+msgid "粉爪大劫案"
+msgstr "ピンククロー強盗"
+
+msgid "粉爪大劫案便利性功能"
+msgstr "ピンククロー強盗の便利機能"
+
+msgid "触发按键"
+msgstr "トリガーキー"
+
+msgid "触发连点将同步生效"
+msgstr "連打トリガーを同期させる"
+
+msgid "触发连点的按键 (按住生效)"
+msgstr "連打トリガーキー (長押しで有効)"
+
+msgid "自动补饵卖鱼"
+msgstr "自動餌補充・魚売却"
+
+msgid "抛竿失败时，补充默认鱼饵并出售鱼获后重试"
+msgstr "キャスト失敗時、デフォルト餌を補充して魚を売却し、再試行します"
+
+msgid "4列对应的键盘按键"
+msgstr "4列に対応するキーボードキー"
+
+msgid "单曲超时时间(秒)"
+msgstr "1曲あたりのタイムアウト時間(秒)"
+
+msgid "异环鼓组音游自动打击与重试"
+msgstr "NTEリズムゲームの自動演奏とリトライ"
+
+msgid "打歌次数, 0=无限循环"
+msgstr "演奏回数、0=無限ループ"
+
+msgid "自动音游"
+msgstr "自動リズムゲーム"
+
+msgid "调试日志"
+msgstr "デバッグログ"
+
+msgid "超时秒数"
+msgstr "タイムアウト秒数"
+
+msgid "输出调试日志"
+msgstr "デバッグログを出力"
+
+msgid "键位"
+msgstr "キー設定"
+
+msgid "Start Game"
+msgstr "ゲームを起動"
+
+msgid "Launcher Path"
+msgstr "ランチャーパス"
+
+msgid "目标消耗体力"
+msgstr "目標スタミナ消費量"
+
+msgid "声音闪避反击"
+msgstr "音声回避反撃"
+
+msgid "未处于自动战斗时, 响应声音闪避或反击"
+msgstr "自動戦闘中でないとき、音による回避または反撃に応答します"
+
+msgid ""
+"All letter/number keys, including every hotkey above, are replaced by US QWERTY\n"
+"physical positions, not your current layout's printed keys."
+msgstr ""
+"上記のすべてのホットキーを含む英数字キーは、現在の配列で印字されたキーではなく、\n"
+"米国QWERTY配列の物理位置に置き換えられます。"
+
+msgid "Use QWERTY Physical Keys"
+msgstr "QWERTY物理キーを使用"
+
+msgid "店长特供"
+msgstr "オーナーセレクション"
+
+msgid "抢钱流"
+msgstr "強盗ビルド"
+
+msgid "游戏启动后自动登录游戏"
+msgstr "ゲーム起動後に自動ログイン"
+
+msgid "自动循环进出关卡（需配合游戏内挂机流派使用）"
+msgstr "ステージへの出入りを自動で繰り返す（ゲーム内の放置ビルドとの併用が必要）"
+
+msgid "自动登录游戏"
+msgstr "自動ログイン"
+
+msgid "领取/补货一咖舍"
+msgstr "カフェの受け取り/補充"
+
+msgid ""
+"功能说明：本功能仅负责『自动退出关卡』与『重新开启关卡』的点击循环，不包含任何局内的制作食物或招待客人操作。\n"
+"\n"
+"使用方法：\n"
+"1. 确保您已配置好游戏内的挂机流派。\n"
+"2. 站在咖啡店可进行 F 交互的位置。\n"
+"3. （可选）若想指定特定关卡，请先手动进入该关卡一次后退出，再启动本脚本即可。"
+msgstr ""
+"機能説明: この機能は「ステージを自動で退出する」と「ステージを再開する」クリック操作のループのみを行います。ステージ内での料理作成や接客操作は含まれません。\n"
+"\n"
+"使い方:\n"
+"1. ゲーム内の放置ビルドを設定済みであることを確認してください。\n"
+"2. カフェで F キーによるインタラクトができる位置に立ってください。\n"
+"3. (任意) 特定のステージを指定したい場合は、先に手動でそのステージに一度入り、退出してからこのスクリプトを開始してください。"
+
+msgid "一咖舍任务"
+msgstr "カフェタスク"
+
+msgid "选择日常任务中的一咖舍处理方式"
+msgstr "デイリータスクでのカフェ処理方法を選択"
+
+msgid "不执行"
+msgstr "実行しない"
+
+msgid "记录新特征"
+msgstr "新しい特徴を記録"
+
+msgid "输入或选择关联的角色名称"
+msgstr "関連キャラクター名を入力または選択"
+
+msgid "输入或选择绑定的{combo} (可选)"
+msgstr "紐付け{combo}を入力または選択（任意）"
