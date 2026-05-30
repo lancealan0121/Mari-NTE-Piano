@@ -1,6 +1,6 @@
 """NTE Piano 設定面板:取代原本 Ctrl+E 開的譜面文字編輯抽屜。
 
-把所有 automation 開關(粉爪/閃避/音遊)與一般設定(動畫/視覺/匯入/焦點)都集中
+把所有 automation 開關(粉爪/失焦靜音)與一般設定(動畫/視覺/匯入/焦點)都集中
 到右側 dock,用 iOS 風格左右開關與拉桿即時操作。原本散落的 modal QDialog 全部
 停用,改在這個 panel 內直接拉。
 
@@ -37,7 +37,6 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListView,
     QPushButton,
     QScrollArea,
@@ -682,7 +681,12 @@ class SettingsPanel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setObjectName("settingsScroll")
-        scroll.set_smooth_enabled(bool(self._get("smooth_scroll_enabled", True)))
+        # viewport 命名,讓 QSS 能單獨給它不透明底色;否則會被 `#nteSettingsRoot
+        # QWidget { transparent }` 塗透明,害 QScrollArea 無法 bitblt、捲動時每步
+        # 全重繪而卡頓。底色被 content 蓋住,外觀不變。
+        scroll.viewport().setObjectName("settingsViewport")
+        # 平滑捲動已併入「動畫效果」總開關,跟著 animations_enabled 走。
+        scroll.set_smooth_enabled(bool(self._get("animations_enabled", True)))
         outer.addWidget(scroll)
         self._scroll = scroll
 
@@ -709,13 +713,9 @@ class SettingsPanel(QWidget):
         self._build_piano_sound_group()
         self._build_visual_group()
         self._build_focus_group()
-        self._build_import_group()
         self._build_dialogs_group()
-        self._build_dodge_group()
-        self._build_rhythm_group()
         self._build_heist_group()
         self._build_global_hotkeys_group()
-        self._build_background_mode_group()
 
     def _add_group(self, title: str) -> QGridLayout:
         group = QGroupBox(title)
@@ -738,7 +738,7 @@ class SettingsPanel(QWidget):
         g.addWidget(speed, 0, 0, 1, 2)
         self._register("playback_speed", speed, speed.value, speed.set_value)
 
-        zoom = LabeledSlider("Piano Roll 縮放", 0.4, 3.0, 0.05, decimals=2, suffix="×")
+        zoom = LabeledSlider("音樂編輯區縮放", 0.4, 3.0, 0.05, decimals=2, suffix="×")
         zoom.set_value(float(self._get("zoom_factor", 1.0)))
         zoom.value_changed.connect(lambda v: self._emit("zoom_factor", float(v)))
         g.addWidget(zoom, 1, 0, 1, 2)
@@ -790,7 +790,7 @@ class SettingsPanel(QWidget):
         g = self._add_group("視覺")
 
         # FPS 用 3 檔 slider snap
-        fps = LabeledSlider("Piano Roll FPS", 0, 2, 1, decimals=0)
+        fps = LabeledSlider("音樂編輯區 FPS", 0, 2, 1, decimals=0)
         # 3 檔顯示文字自訂
         cur_fps = int(self._get("roll_fps", 60))
         cur_idx = next((i for i, (v, _) in enumerate(self._FPS_OPTIONS) if v == cur_fps), 1)
@@ -874,59 +874,25 @@ class SettingsPanel(QWidget):
         g.addWidget(kbd, 6, 0, 1, 2)
         self._register("show_piano_keyboard", kbd, kbd.isChecked, kbd.setChecked)
 
+        # 動畫效果總開關:除了 note 動畫,也統一控制設定面板與音樂編輯區的平滑
+        # 捲動/縮放(平滑效果已併入此開關,不再各自獨立)。面板自家 scroll 在這裡
+        # 直接套用,piano roll 的平滑由主視窗 _on_animations_toggled 連帶處理。
         anim = ToggleSwitchRow("動畫效果")
         anim.setChecked(bool(self._get("animations_enabled", True)))
-        anim.toggled.connect(lambda c: self._emit("animations_enabled", bool(c)))
-        g.addWidget(anim, 7, 0, 1, 2)
-        self._register("animations_enabled", anim, anim.isChecked, anim.setChecked)
+        anim.setToolTip("含 note 動畫、設定面板與音樂編輯區的平滑捲動/縮放")
 
-        # 平滑捲動 toggle:直接在面板內套用到自家 scroll area,不靠主視窗繞回來。
-        smooth = ToggleSwitchRow("平滑捲動設定面板")
-        smooth.setChecked(bool(self._get("smooth_scroll_enabled", True)))
-
-        def _on_smooth_toggled(checked: bool) -> None:
+        def _on_anim_toggled(checked: bool) -> None:
             self._scroll.set_smooth_enabled(bool(checked))
-            self._emit("smooth_scroll_enabled", bool(checked))
+            self._emit("animations_enabled", bool(checked))
 
-        smooth.toggled.connect(_on_smooth_toggled)
-        g.addWidget(smooth, 8, 0, 1, 2)
+        anim.toggled.connect(_on_anim_toggled)
+        g.addWidget(anim, 7, 0, 1, 2)
 
-        def _smooth_set(value: Any) -> None:
-            smooth.setChecked(bool(value))
+        def _anim_set(value: Any) -> None:
+            anim.setChecked(bool(value))
             self._scroll.set_smooth_enabled(bool(value))
 
-        self._register(
-            "smooth_scroll_enabled", smooth, smooth.isChecked, _smooth_set
-        )
-
-        # 音樂編輯區(piano roll)滾輪平滑捲動。獨立於上面設定面板那個 toggle。
-        # 關閉後回到一格一格離散跳。
-        smooth_roll = ToggleSwitchRow("平滑捲動音樂編輯區")
-        smooth_roll.setChecked(bool(self._get("smooth_scroll_pianoroll", True)))
-        smooth_roll.toggled.connect(
-            lambda c: self._emit("smooth_scroll_pianoroll", bool(c))
-        )
-        g.addWidget(smooth_roll, 9, 0, 1, 2)
-        self._register(
-            "smooth_scroll_pianoroll",
-            smooth_roll,
-            smooth_roll.isChecked,
-            smooth_roll.setChecked,
-        )
-
-        # 音樂編輯區 Ctrl+滾輪縮放平滑過渡。140ms OutCubic;關閉時直接生效無動畫。
-        smooth_zoom = ToggleSwitchRow("平滑縮放音樂編輯區")
-        smooth_zoom.setChecked(bool(self._get("smooth_zoom_pianoroll", True)))
-        smooth_zoom.toggled.connect(
-            lambda c: self._emit("smooth_zoom_pianoroll", bool(c))
-        )
-        g.addWidget(smooth_zoom, 10, 0, 1, 2)
-        self._register(
-            "smooth_zoom_pianoroll",
-            smooth_zoom,
-            smooth_zoom.isChecked,
-            smooth_zoom.setChecked,
-        )
+        self._register("animations_enabled", anim, anim.isChecked, _anim_set)
 
     def _build_focus_group(self) -> None:
         g = self._add_group("遊戲視窗")
@@ -948,23 +914,6 @@ class SettingsPanel(QWidget):
         mute.toggled.connect(lambda c: self._emit("mute_on_focus_loss", bool(c)))
         g.addWidget(mute, 2, 0, 1, 2)
         self._register("mute_on_focus_loss", mute, mute.isChecked, mute.setChecked)
-
-    def _build_import_group(self) -> None:
-        g = self._add_group("匯入")
-
-        trim = ToggleSwitchRow("自動跳過譜面開頭空白")
-        trim.setChecked(bool(self._get("auto_trim_leading_silence", True)))
-        trim.toggled.connect(lambda c: self._emit("auto_trim_leading_silence", bool(c)))
-        g.addWidget(trim, 0, 0, 1, 2)
-        self._register(
-            "auto_trim_leading_silence", trim, trim.isChecked, trim.setChecked
-        )
-
-        tempo = ToggleSwitchRow("匯入時一起匯入變速 (@)")
-        tempo.setChecked(bool(self._get("import_tempo_changes", False)))
-        tempo.toggled.connect(lambda c: self._emit("import_tempo_changes", bool(c)))
-        g.addWidget(tempo, 1, 0, 1, 2)
-        self._register("import_tempo_changes", tempo, tempo.isChecked, tempo.setChecked)
 
     def _build_dialogs_group(self) -> None:
         g = self._add_group("對話框")
@@ -992,97 +941,6 @@ class SettingsPanel(QWidget):
             "confirm_delete_song", delete, delete.isChecked, delete.setChecked
         )
 
-    def _build_dodge_group(self) -> None:
-        g = self._add_group("自動閃避 (F10)")
-
-        enable = ToggleSwitchRow("啟用")
-        enable.setChecked(bool(self._get("dodge_active", False)))
-        enable.toggled.connect(lambda c: self._emit("dodge_active", bool(c)))
-        g.addWidget(enable, 0, 0, 1, 2)
-        self._register("dodge_active", enable, enable.isChecked, enable.setChecked)
-
-        thr = LabeledSlider("閃避閾值", 0.01, 1.0, 0.01, decimals=2)
-        thr.set_value(float(self._get("dodge_threshold", 0.13)))
-        thr.value_changed.connect(lambda v: self._emit("dodge_threshold", float(v)))
-        g.addWidget(thr, 1, 0, 1, 2)
-        self._register("dodge_threshold", thr, thr.value, thr.set_value)
-
-        ctr = LabeledSlider("反擊閾值", 0.01, 1.0, 0.01, decimals=2)
-        ctr.set_value(float(self._get("dodge_counter_threshold", 0.12)))
-        ctr.value_changed.connect(lambda v: self._emit("dodge_counter_threshold", float(v)))
-        g.addWidget(ctr, 2, 0, 1, 2)
-        self._register("dodge_counter_threshold", ctr, ctr.value, ctr.set_value)
-
-        g.addWidget(QLabel("閃避按鍵"), 3, 0)
-        key = KeybindCaptureWidget(initial=str(self._get("dodge_key", "shift")))
-        key.key_changed.connect(lambda name: self._emit("dodge_key", str(name) or "shift"))
-        g.addWidget(key, 3, 1)
-        self._register(
-            "dodge_key", key,
-            lambda: key.key_name() or "shift",
-            lambda v: key.set_key_name(str(v)),
-        )
-
-        mouse = ToggleSwitchRow("反擊用滑鼠左鍵")
-        mouse.setChecked(bool(self._get("dodge_counter_use_mouse", True)))
-        mouse.toggled.connect(lambda c: self._emit("dodge_counter_use_mouse", bool(c)))
-        g.addWidget(mouse, 4, 0, 1, 2)
-        self._register(
-            "dodge_counter_use_mouse", mouse, mouse.isChecked, mouse.setChecked
-        )
-
-    def _build_rhythm_group(self) -> None:
-        g = self._add_group("自動音遊 (F11)")
-
-        enable = ToggleSwitchRow("啟用")
-        enable.setChecked(bool(self._get("rhythm_active", False)))
-        enable.toggled.connect(lambda c: self._emit("rhythm_active", bool(c)))
-        g.addWidget(enable, 0, 0, 1, 2)
-        self._register("rhythm_active", enable, enable.isChecked, enable.setChecked)
-
-        loop = LabeledSlider("循環次數(0=無限)", 0, 50, 1, decimals=0, suffix=" 次")
-        loop.set_value(int(self._get("rhythm_loop_count", 0)))
-        loop.value_changed.connect(lambda v: self._emit("rhythm_loop_count", int(round(v))))
-        g.addWidget(loop, 1, 0, 1, 2)
-        self._register(
-            "rhythm_loop_count", loop,
-            lambda: int(round(loop.value())), lambda v: loop.set_value(float(v))
-        )
-
-        timeout = LabeledSlider("單曲超時", 30, 600, 10, decimals=0, suffix=" 秒")
-        timeout.set_value(int(self._get("rhythm_timeout_seconds", 180)))
-        timeout.value_changed.connect(
-            lambda v: self._emit("rhythm_timeout_seconds", int(round(v)))
-        )
-        g.addWidget(timeout, 2, 0, 1, 2)
-        self._register(
-            "rhythm_timeout_seconds", timeout,
-            lambda: int(round(timeout.value())), lambda v: timeout.set_value(float(v))
-        )
-
-        g.addWidget(QLabel("4 軌按鍵(逗號分隔)"), 3, 0)
-        keys = QLineEdit()
-        keys.setObjectName("settingsLineEdit")
-        keys.setText(str(self._get("rhythm_track_keys", "d,f,j,k")))
-        keys.editingFinished.connect(
-            lambda: self._emit("rhythm_track_keys", keys.text().strip() or "d,f,j,k")
-        )
-        g.addWidget(keys, 3, 1)
-        self._register(
-            "rhythm_track_keys", keys,
-            lambda: keys.text().strip() or "d,f,j,k",
-            lambda v: keys.setText(str(v)),
-        )
-
-        delay = LabeledSlider("打擊延遲", -100, 200, 5, decimals=0, suffix=" ms")
-        delay.set_value(int(self._get("rhythm_delay_ms", 0)))
-        delay.value_changed.connect(lambda v: self._emit("rhythm_delay_ms", int(round(v))))
-        g.addWidget(delay, 4, 0, 1, 2)
-        self._register(
-            "rhythm_delay_ms", delay,
-            lambda: int(round(delay.value())), lambda v: delay.set_value(float(v))
-        )
-
     def _build_heist_group(self) -> None:
         g = self._add_group("粉爪大劫案")
 
@@ -1108,7 +966,7 @@ class SettingsPanel(QWidget):
         g.addWidget(auto, 2, 0, 1, 2)
         self._register("heist_auto_mode", auto, auto.isChecked, auto.setChecked)
 
-        g.addWidget(QLabel("全自動 toggle 熱鍵"), 3, 0)
+        g.addWidget(QLabel("全自動切換熱鍵"), 3, 0)
         hotkey = KeybindCaptureWidget(
             initial=str(self._get("heist_auto_mode_hotkey", "f8"))
         )
@@ -1129,8 +987,6 @@ class SettingsPanel(QWidget):
             ("hotkey_play", "播放", "f6"),
             ("hotkey_stop", "停止", "f7"),
             ("hotkey_pause", "暫停", "f8"),
-            ("hotkey_dodge", "閃避", "f10"),
-            ("hotkey_rhythm", "音游", "f11"),
         ]
         for idx, (key, label, default) in enumerate(rows):
             g.addWidget(QLabel(label), idx, 0)
@@ -1145,20 +1001,6 @@ class SettingsPanel(QWidget):
                 widget.key_name,
                 widget.set_key_name,
             )
-
-    def _build_background_mode_group(self) -> None:
-        g = self._add_group("後台送鍵")
-
-        # 預設關 — 一般情境下「視窗在前景就走 SendInput,視窗失焦自動切
-        # PostMessage」已經夠用。開啟此選項會強制走 PostMessage,適合想要完全
-        # 不切視窗的情境(例如另一螢幕掛機操作)。
-        force = ToggleSwitchRow("強制後台模式(視窗不在前景也送鍵)")
-        force.setChecked(bool(self._get("force_background_mode", False)))
-        force.toggled.connect(lambda c: self._emit("force_background_mode", bool(c)))
-        g.addWidget(force, 0, 0, 1, 2)
-        self._register(
-            "force_background_mode", force, force.isChecked, force.setChecked
-        )
 
     # ----- 共用工具 -----
 
@@ -1272,6 +1114,12 @@ QWidget#settingsContent {{
 QScrollArea#settingsScroll {{
     background: {panel};
     border: none;
+}}
+/* QScrollArea 的 viewport 會被上面 `#nteSettingsRoot QWidget` 規則塗成
+   transparent,導致捲動時無法 bitblt、每步全重繪而卡頓。用高優先序選擇器
+   給它不透明底色(被 content 蓋住,外觀不變),讓 Qt 走快速捲動。 */
+QWidget#nteSettingsRoot QWidget#settingsViewport {{
+    background: {panel};
 }}
 
 QWidget#nteSettingsRoot QGroupBox#settingsGroup {{

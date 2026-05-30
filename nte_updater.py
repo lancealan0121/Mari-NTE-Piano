@@ -1,6 +1,6 @@
 """GitHub Releases 拉式自動更新。
 
-設計沿用 nte_automation.py 內 `AutomationProxy` + `AutomationTask` 模式:
+設計採 main-thread QObject proxy + worker thread 模式:
 - Proxy 是 main-thread QObject,只負責跨執行緒 emit signal 給 GUI。
 - Task 是 threading.Thread (daemon=True),用 _stop_event 取消。
 - 刻意不用 QThread,理由見 CLAUDE.md「Threading pattern」段。

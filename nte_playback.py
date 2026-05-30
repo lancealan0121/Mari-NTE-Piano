@@ -8,11 +8,11 @@
         _configure_winapi / is_running_as_admin
         WindowInfo / find_game_window / invalidate_window_cache / focus_window /
         is_window_alive / foreground_hwnd / is_target_foreground
-    後台送鍵 (PostMessage):
+    PostMessage 直送 (HeistController 粉爪 tap 用):
         WM_KEYDOWN / WM_KEYUP
-        name_to_vk / post_key_down / post_key_up / post_key_to_window
+        post_key_down / post_key_up / post_key_to_window
     後端:
-        KeyBackend / PynputBackend / PyDirectInputBackend / PostMessageBackend
+        KeyBackend / PynputBackend / PyDirectInputBackend
         create_backend / create_backend_with_fallback
     播放:
         ScheduledAction / PlaybackWorker
@@ -36,9 +36,8 @@ import threading
 import time
 from collections import defaultdict
 from ctypes import wintypes
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Callable
 
 from PySide6.QtCore import QObject, Signal, Slot
 
@@ -208,7 +207,7 @@ _GAME_TITLE_RE = re.compile(rf"\b{re.escape(GAME_TITLE_HINT)}\b", re.IGNORECASE)
 
 # find_game_window 每次跑 EnumWindows + QueryFullProcessImageName per window,
 # 在背景有上百個窗口時單次成本 0.5-2ms。HeistController 100Hz polling 一秒
-# 燒 50-200ms,RhythmTask / NTECheckerProbe / 後台送鍵 hwnd 查詢也都共用。
+# 燒 50-200ms,NTECheckerProbe / 後台送鍵 hwnd 查詢也都共用。
 # 5 秒 TTL + 失效時驗證 is_window_alive,99% 路徑變成一次 dict lookup。
 _WINDOW_CACHE_TTL = 5.0
 _window_cache: dict = {"info": None, "ts": 0.0, "hit": 0, "miss": 0, "last_flush": 0.0}
@@ -351,10 +350,9 @@ def is_target_foreground(hwnd: int) -> bool:
 
 
 # ============================================================================
-# PostMessage 後台送鍵 — 不需視窗在前景,把 WM_KEYDOWN/WM_KEYUP 直接 post 到
-# 指定 hwnd 的訊息佇列。系統 keyboard state 完全不動,因此:
-#   - 使用者按住實體鍵時不會被 SendInput key_up 蓋掉
-#   - 視窗失焦時(切離前景)仍能送到遊戲
+# PostMessage 直送 — 把 WM_KEYDOWN/WM_KEYUP 直接 post 到指定 hwnd 的訊息佇列,
+# 系統 keyboard state 完全不動,使用者實體按鍵不會被蓋掉。HeistController 粉爪
+# 靠 post_key_to_window 做 tap-style 連點。
 #
 # 對 Unity 舊 Input Manager 與多數走 Windows message 迴圈的遊戲有效;
 # 對使用 RawInput / 新 Input System Package 的遊戲無效(此時 hwnd 收得到
@@ -363,48 +361,6 @@ def is_target_foreground(hwnd: int) -> bool:
 
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
-
-# 特殊鍵名 → Windows VK code 對照。字母 a-z 與數字 0-9 直接從 ord('A')/ord('0')
-# 算出來,不入這張表。F1-F12 也走專屬分支。其他用 dict 寫死。
-_SPECIAL_NAME_TO_VK = {
-    "shift": 0x10,
-    "ctrl": 0x11,
-    "control": 0x11,
-    "alt": 0x12,
-    "space": 0x20,
-    "enter": 0x0D,
-    "return": 0x0D,
-    "esc": 0x1B,
-    "escape": 0x1B,
-    "tab": 0x09,
-    "backspace": 0x08,
-}
-
-
-def name_to_vk(key: str) -> int | None:
-    """把按鍵名稱('a' / 'f6' / 'shift')轉成 Windows VK code。找不到回 None。
-
-    跟 nte_automation._heist_vk_code 邏輯一致但不依賴(避免循環 import);
-    後者保留給 HeistController 內部 polling 用,本函式給 PostMessageBackend 用。
-    """
-    if not key:
-        return None
-    name = str(key).strip().lower()
-    if not name:
-        return None
-    if name in _SPECIAL_NAME_TO_VK:
-        return _SPECIAL_NAME_TO_VK[name]
-    if name.startswith("f") and name[1:].isdigit():
-        idx = int(name[1:])
-        if 1 <= idx <= 12:
-            return 0x70 + idx - 1  # VK_F1..VK_F12
-    if len(name) == 1:
-        # a-z / 0-9 的 VK code 直接等於 ASCII 大寫,跳過 VkKeyScanW
-        # (某些 keyboard layout 切換時 VkKeyScanW 會回 -1)。
-        code = ord(name.upper())
-        if 0x41 <= code <= 0x5A or 0x30 <= code <= 0x39:
-            return code
-    return None
 
 
 def post_key_down(hwnd: int, vk: int) -> bool:
@@ -537,84 +493,11 @@ class NullBackend(KeyBackend):
         return None
 
 
-class PostMessageBackend(KeyBackend):
-    """後台送鍵 backend — PostMessage 直送指定 hwnd 的訊息佇列。
-
-    跟 PynputBackend / PyDirectInputBackend 的差異:後兩者走 SendInput /
-    keybd_event,事件注入系統輸入佇列,使用者實體鍵與遊戲共用 keyboard state;
-    PostMessage 把 message 投到指定 hwnd,系統 state 完全不動,因此:
-        - 視窗不在前景也能送鍵(背景模式)
-        - 使用者實體按鍵不會被 backend 的 key_up 蓋掉
-
-    限制:對使用 RawInput / 新 Input System 的遊戲無效。NTE 經 HeistController
-    粉爪實測有效。
-
-    hwnd_provider 每次 key_down/up 都會呼叫,可以動態回最新 hwnd
-    (遊戲重啟、視窗 handle 改變等場景)。建議配 find_game_window 的 cache
-    使用,呼叫成本接近零。
-    """
-
-    name = "postmessage"
-
-    def __init__(self, hwnd_provider: Callable[[], int]) -> None:
-        self._hwnd_provider = hwnd_provider
-        # PostMessage 沒有「鍵當前是否 down」概念,自己維護:
-        #   - 同一鍵連送 key_down → 遊戲只收第一次,後續被當 auto-repeat 略過
-        #   - 沒 down 就 key_up → 浪費 PostMessage 也可能引發奇怪狀態
-        self._down: set[str] = set()
-
-    def _hwnd(self) -> int:
-        try:
-            value = self._hwnd_provider()
-        except Exception:  # noqa: BLE001
-            return 0
-        if value is None:
-            return 0
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return 0
-
-    def key_down(self, key: str) -> None:
-        if not key or key in self._down:
-            return
-        vk = name_to_vk(key)
-        if vk is None:
-            return
-        hwnd = self._hwnd()
-        if not hwnd:
-            return
-        if post_key_down(hwnd, vk):
-            self._down.add(key)
-
-    def key_up(self, key: str) -> None:
-        if not key or key not in self._down:
-            return
-        vk = name_to_vk(key)
-        if vk is not None:
-            hwnd = self._hwnd()
-            if hwnd:
-                post_key_up(hwnd, vk)
-        # 即使 PostMessage 失敗也清掉 _down — 否則之後 key_down 永遠被擋。
-        self._down.discard(key)
-
-    def release_all(self) -> None:
-        """切換 backend 時用,把所有當前認為 down 的鍵發 key_up。"""
-        for key in list(self._down):
-            self.key_up(key)
-
-
-def create_backend(
-    name: str, hwnd_provider: Callable[[], int] | None = None
-) -> KeyBackend:
+def create_backend(name: str) -> KeyBackend:
     if name == PynputBackend.name:
         return PynputBackend()
     if name == PyDirectInputBackend.name:
         return PyDirectInputBackend()
-    if name == PostMessageBackend.name:
-        if hwnd_provider is None:
-            raise RuntimeError("postmessage backend 需要 hwnd_provider")
-        return PostMessageBackend(hwnd_provider)
     raise RuntimeError(f"未知的按鍵後端:{name}")
 
 
@@ -658,11 +541,8 @@ class PlaybackWorker(QObject):
         focus_before_play: bool = False,
         initial_offset_seconds: float = 0.0,
         speed: float = 1.0,
-        auto_trim_leading: bool = True,
         loop_end_seconds: float | None = None,
         silent_mode: bool = False,
-        force_background: bool = False,
-        hwnd_provider: Callable[[], int] | None = None,
     ):
         super().__init__()
         self._sheet = sheet
@@ -671,7 +551,6 @@ class PlaybackWorker(QObject):
         self._focus_before_play = focus_before_play
         self._speed = max(0.1, float(speed))
         self._initial_offset = max(0.0, float(initial_offset_seconds)) / self._speed
-        self._auto_trim_leading = bool(auto_trim_leading)
         self._silent_mode = bool(silent_mode)
         # 播放區間結尾(原始秒數,未除 speed);超過此秒數的 action 不送並停止播放。
         # None 表示無限制,跑到譜面結尾為止。
@@ -690,17 +569,6 @@ class PlaybackWorker(QObject):
         self._seek_target = 0.0
         self._started_at = 0.0
         self._speed_dirty = False
-        # 後台送鍵切換:
-        #   _fg_backend     = pydirectinput / pynput(視窗在前景時用)
-        #   _bg_backend     = PostMessageBackend(視窗不在前景或強制後台時用)
-        #   _force_background 為 True 時強制走 bg_backend
-        # backend 切換在 run() loop 內每 200ms 檢查一次,避免每個 action 都做
-        # foreground syscall。
-        self._force_background = bool(force_background)
-        self._hwnd_provider = hwnd_provider
-        self._fg_backend: KeyBackend | None = None
-        self._bg_backend: KeyBackend | None = None
-        self._last_backend_check_ts = 0.0
 
     def request_stop(self) -> None:
         self._stop_event.set()
@@ -723,16 +591,6 @@ class PlaybackWorker(QObject):
             if self._seek_pending:
                 self._seek_target = max(0.0, music_seconds) / speed
             self._speed_dirty = True
-
-    def set_force_background(self, value: bool) -> None:
-        """切換「強制後台模式」。播放途中可呼叫;下次 _resolve_backend 立即生效。"""
-        new_value = bool(value)
-        with self._lock:
-            if self._force_background == new_value:
-                return
-            self._force_background = new_value
-            # 不等 200ms 防抖,讓使用者立刻看到切換效果。
-            self._last_backend_check_ts = 0.0
 
     def request_pause(self) -> None:
         with self._lock:
@@ -769,21 +627,8 @@ class PlaybackWorker(QObject):
         try:
             if self._silent_mode:
                 backend = NullBackend()
-                self._fg_backend = backend
-                self._bg_backend = None
             else:
                 backend, _ = create_backend_with_fallback()
-                self._fg_backend = backend
-                # bg_backend 只在有 hwnd_provider 時建,沒有就永遠走 fg。
-                # PostMessageBackend 不需重型初始化,建構基本上零成本。
-                if self._hwnd_provider is not None:
-                    try:
-                        self._bg_backend = PostMessageBackend(self._hwnd_provider)
-                    except Exception:  # noqa: BLE001
-                        self._bg_backend = None
-                else:
-                    self._bg_backend = None
-            self._last_backend_check_ts = 0.0
             actions = self._build_schedule()
             if perf.enabled:
                 perf.log(
@@ -793,20 +638,7 @@ class PlaybackWorker(QObject):
                     silent=self._silent_mode,
                     speed=self._speed,
                     backend=backend.name,
-                    bg_available=int(self._bg_backend is not None),
-                    force_bg=int(self._force_background),
                 )
-            # auto-trim leading silence:若譜面首音落在 SKIP_THRESHOLD 之後,把
-            # _initial_offset 設成首音秒數,等同把 cursor 快轉到首音前一刻。
-            # 只在沒指定 initial_offset(非 seek 場景)且 auto_trim 開啟時生效。
-            # piano_roll 的 cursor 同樣從 started_at 起算 → 自動跟著快轉,視覺對齊。
-            if self._auto_trim_leading and self._initial_offset == 0.0:
-                first_down = next(
-                    (a.seconds for a in actions if a.kind == "down"),
-                    None,
-                )
-                if first_down is not None and first_down > self.SKIP_THRESHOLD_SECONDS:
-                    self._initial_offset = first_down
             if self._wait(self._start_delay):
                 stopped = True
                 return
@@ -826,10 +658,6 @@ class PlaybackWorker(QObject):
                 if self._stop_event.is_set():
                     stopped = True
                     break
-
-                # backend 自動切換(前景/後台)。內部 200ms 防抖,所以即使每個
-                # action 都呼叫也不會頻繁做 foreground syscall。
-                backend = self._resolve_backend(backend)
 
                 with self._lock:
                     speed_dirty = self._speed_dirty
@@ -954,47 +782,6 @@ class PlaybackWorker(QObject):
         self.active_notes.emit([])
         return target
 
-    BACKEND_CHECK_INTERVAL = 0.2
-
-    def _resolve_backend(self, current: KeyBackend) -> KeyBackend:
-        """200ms 防抖內回傳當前該用的 backend;切換時 release_all 舊 backend。
-
-        無 hwnd_provider 或 silent_mode → 直接回原 backend(永遠 fg / null)。
-        force_background True → 一律 bg_backend。
-        否則:視窗在前景 → fg_backend;不在前景 → bg_backend。
-
-        切 backend 會把舊 backend 認為 down 的鍵 key_up,使用者最多在切換瞬間
-        聽到一個音被截斷。
-        """
-        if self._silent_mode or self._bg_backend is None:
-            return current
-        now = time.perf_counter()
-        if now - self._last_backend_check_ts < self.BACKEND_CHECK_INTERVAL:
-            return current
-        self._last_backend_check_ts = now
-        with self._lock:
-            force_bg = self._force_background
-        if force_bg:
-            target = self._bg_backend
-        elif self._target_hwnd and not is_target_foreground(self._target_hwnd):
-            target = self._bg_backend
-        else:
-            target = self._fg_backend
-        if target is current:
-            return current
-        # 切換瞬間先 release 舊 backend 持有的鍵,否則舊 backend 內部 _down
-        # set / pydirectinput state 會留住。
-        self._release_all(current)
-        if perf.enabled:
-            perf.log(
-                "worker",
-                "backend_switch",
-                from_=current.name,
-                to=target.name,
-                force_bg=int(force_bg),
-            )
-        return target
-
     def _build_schedule(self):
         actions = []
         speed = self._speed if self._speed > 0 else 1.0
@@ -1037,7 +824,62 @@ class PlaybackWorker(QObject):
                 actions.append(ScheduledAction(release_seconds, 0, "up", index, event))
 
         actions.sort(key=lambda action: (action.seconds, action.priority, action.event_index))
+        actions = self._coalesce_concurrent_downs(actions)
         return actions
+
+    # 同 onset 視為同一次 chord 的時間容差。1ms 比譜面節奏單位小一個數量級,
+    # 不會把相鄰的不同拍誤合在一起。
+    COALESCE_TOLERANCE_SECONDS = 0.001
+
+    def _coalesce_concurrent_downs(self, actions):
+        """合併同 seconds 的多個 down ScheduledAction 成單一 chord。
+
+        R/L 是不同 track 的兩個獨立 NoteEvent,同 start_beats 也不會在 parse / sort
+        階段合併,於是 main loop sequential 處理時每個 chord_down 內的
+        modifier_delay sleep 會累積,導致同 onset 的 R/L 聽起來時差(上比較快、
+        下晚一點)。把同 onset 的 down 合成一個 chord 後,_chord_down 已有的
+        modifier-set grouping 邏輯接得上,所有 strokes 在一次 chord_down 內按下。
+
+        up / progress action 不合:up 因為 retrigger gap 各自 release 時間不同;
+        progress 合不合對 statusBar 顯示影響不大,維持原 per-event 粒度。
+        """
+        if not actions:
+            return actions
+        merged: list[ScheduledAction] = []
+        i = 0
+        n = len(actions)
+        tol = self.COALESCE_TOLERANCE_SECONDS
+        while i < n:
+            head = actions[i]
+            if head.kind != "down":
+                merged.append(head)
+                i += 1
+                continue
+            j = i + 1
+            while (
+                j < n
+                and actions[j].kind == "down"
+                and abs(actions[j].seconds - head.seconds) < tol
+            ):
+                j += 1
+            if j == i + 1:
+                merged.append(head)
+            else:
+                group = actions[i:j]
+                all_strokes = tuple(stroke for a in group for stroke in a.event.strokes)
+                tracks = sorted({a.event.track for a in group})
+                sources = " + ".join(a.event.source for a in group)
+                merged_event = replace(
+                    head.event,
+                    strokes=all_strokes,
+                    track=" + ".join(tracks),
+                    source=sources,
+                )
+                merged.append(ScheduledAction(
+                    head.seconds, head.priority, "down", head.event_index, merged_event,
+                ))
+            i = j
+        return merged
 
     def _focus_target_window(self) -> None:
         if self._silent_mode:
@@ -1211,8 +1053,6 @@ class HotkeyBridge(QObject):
     play_requested = Signal()
     stop_requested = Signal()
     pause_requested = Signal()
-    dodge_requested = Signal()
-    rhythm_requested = Signal()
 
 
 # 全域熱鍵動作 → 中文短標籤,給 start() 組訊息用("F6 播放 / F7 停止 ...")。
@@ -1220,8 +1060,6 @@ _HOTKEY_ACTION_LABELS = {
     "play": "播放",
     "stop": "停止",
     "pause": "暫停",
-    "dodge": "閃避",
-    "rhythm": "音游",
 }
 
 
@@ -1239,8 +1077,7 @@ class GlobalHotkeys:
     ):
         """以 hotkey_map 動態註冊全域熱鍵。
 
-        hotkey_map: {"play": "f6", "stop": "f7", "pause": "f8",
-                     "dodge": "f10", "rhythm": "f11"}
+        hotkey_map: {"play": "f6", "stop": "f7", "pause": "f8"}
         值為空字串視為停用該動作的熱鍵。未提供的 action 不註冊。
 
         為了向後相容,hotkey_map=None 時退回原本 hardcode 預設。
@@ -1256,8 +1093,6 @@ class GlobalHotkeys:
                 "play": "f6",
                 "stop": "f7",
                 "pause": "f8",
-                "dodge": "f10",
-                "rhythm": "f11",
             }
         self._current_map = dict(hotkey_map)
 
